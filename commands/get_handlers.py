@@ -1,5 +1,5 @@
 from telegram.ext import CommandHandler
-from . import start, ping, today, tomorrow, week
+from . import start, ping, today, tomorrow, week, verify
 
 def get_handlers():
     return [
