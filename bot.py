@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from aiohttp import web
 import requests
+import asyncio
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -86,7 +87,8 @@ async def handle(request):
         return web.Response(status=500, text="error")
 
 # --- Запуск ---
-if __name__ == '__main__':
+async def main():
+    global app
     logging.info("🚀 Бот запускается через вебхук...")
 
     app = ApplicationBuilder().token(TOKEN).build()
@@ -96,14 +98,16 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("tomorrow", tomorrow))
     app.add_handler(CommandHandler("week", week))
 
-    aio_app = web.Application()
-    aio_app.router.add_post(WEBHOOK_PATH, handle)
-
     if WEBHOOK_URL:
         try:
+            await app.bot.set_webhook(url=WEBHOOK_URL)
             logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
-            app.bot.set_webhook(url=WEBHOOK_URL)
         except Exception as e:
             logging.error(f"Ошибка установки вебхука: {e}")
 
+    aio_app = web.Application()
+    aio_app.router.add_post(WEBHOOK_PATH, handle)
     web.run_app(aio_app, port=10000)
+
+if __name__ == "__main__":
+    asyncio.run(main())
