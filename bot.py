@@ -10,7 +10,7 @@ import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes
 
-from commands import get_handlers  # ← импорт твоих команд
+from commands.get_handlers import get_handlers
 
 # --- Логирование ---
 logging.basicConfig(level=logging.INFO)
