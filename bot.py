@@ -20,19 +20,21 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("ping", ping))
 
-# Обработчик Telegram webhook-а
+# Создаём aiohttp-приложение
+aio_app = web.Application()
+
+# Регистрируем webhook handler — только ПОСЛЕ инициализации!
 async def handle(request):
     data = await request.json()
     update = Update.de_json(data, app.bot)
     await app.process_update(update)
     return web.Response(text="OK")
 
-# aiohttp-приложение
-aio_app = web.Application()
 aio_app.add_routes([web.post(WEBHOOK_PATH, handle)])
 
-# Установка вебхука
-async def on_startup(app_):
+# Инициализация и установка вебхука на старте
+async def on_startup(app_: web.Application):
+    await app.initialize()  # 🔧 ВАЖНО: вручную инициализируем приложение
     webhook_url = f"https://kaban-eblan-bot.onrender.com{WEBHOOK_PATH}"
     await app.bot.set_webhook(webhook_url)
     print(f"✅ Webhook установлен: {webhook_url}")
