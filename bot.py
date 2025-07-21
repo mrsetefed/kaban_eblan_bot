@@ -4,8 +4,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from aiohttp import web
 
 TOKEN = os.environ["BOT_TOKEN"]
-WEBHOOK_PATH = "/"  # Render по умолчанию прокидывает на /
-PORT = int(os.environ.get("PORT", 8080))  # Render требует слушать этот порт
+PORT = int(os.environ.get("PORT", 8080))
+WEBHOOK_PATH = "/"  # путь, на который Telegram шлёт запросы
 
 # Создаём бота
 app = ApplicationBuilder().token(TOKEN).build()
@@ -20,12 +20,19 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("ping", ping))
 
-# Создаём aiohttp-приложение
-aio_app = web.Application()
-aio_app.add_routes([web.post(WEBHOOK_PATH, app.webhook_handler())])
+# Обработчик Telegram webhook-а
+async def handle(request):
+    data = await request.json()
+    update = Update.de_json(data, app.bot)
+    await app.process_update(update)
+    return web.Response(text="OK")
 
-# Устанавливаем вебхук на нужный URL (только при старте, если не установлен)
-async def on_startup(app_: web.Application):
+# aiohttp-приложение
+aio_app = web.Application()
+aio_app.add_routes([web.post(WEBHOOK_PATH, handle)])
+
+# Установка вебхука
+async def on_startup(app_):
     webhook_url = f"https://kaban-eblan-bot.onrender.com{WEBHOOK_PATH}"
     await app.bot.set_webhook(webhook_url)
     print(f"✅ Webhook установлен: {webhook_url}")
@@ -33,6 +40,6 @@ async def on_startup(app_: web.Application):
 aio_app.on_startup.append(on_startup)
 
 # Запуск
-if __name__ == '__main__':
-    print("🚀 Bot is starting via webhook...")
+if __name__ == "__main__":
+    print("🚀 Бот запускается через вебхук...")
     web.run_app(aio_app, port=PORT)
