@@ -107,7 +107,15 @@ async def main():
 
     aio_app = web.Application()
     aio_app.router.add_post(WEBHOOK_PATH, handle)
-    web.run_app(aio_app, port=10000)
+
+    # Вместо web.run_app
+    runner = web.AppRunner(aio_app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=10000)
+    await site.start()
+
+    logging.info("🌐 Сервер слушает порт 10000")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
