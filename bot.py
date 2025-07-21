@@ -1,5 +1,6 @@
 import os
 import sys
+import asyncio
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -34,10 +35,38 @@ async def schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("pong")
 
+# -------------------------------
+# 💡 Минимальный HTTP-сервер для Render
+# -------------------------------
+from aiohttp import web
+
+async def handle(request):
+    return web.Response(text="Bot is alive")
+
+async def run_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 8080)))
+    await site.start()
+# -------------------------------
+
 # Запуск
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("schedule", schedule))
     app.add_handler(CommandHandler("ping", ping))
-    app.run_polling()
+
+    # Запускаем всё в одном asyncio loop
+    async def main():
+        # Стартуем фейковый HTTP-сервер
+        await run_web_server()
+        # Запускаем бота
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        print("🤖 Бот запущен (polling + фейковый HTTP)!")
+
+    asyncio.run(main())
