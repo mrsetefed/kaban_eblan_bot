@@ -40,13 +40,13 @@ async def main():
     logging.info("\ud83d\ude80 Бот запускается через вебхук...")
 
     app = ApplicationBuilder().token(TOKEN).build()
-    for handler in get_handlers():
-    app.add_handler(handler)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("ping", ping))
-    app.add_handler(CommandHandler("today", today))
-    app.add_handler(CommandHandler("tomorrow", tomorrow))
-    app.add_handler(CommandHandler("week", week))
+    for handler in get_handlers(): 
+        app.add_handler(handler)
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("ping", ping))
+        app.add_handler(CommandHandler("today", today))
+        app.add_handler(CommandHandler("tomorrow", tomorrow))
+        app.add_handler(CommandHandler("week", week))
 
     if WEBHOOK_URL:
         try:
