@@ -1,70 +1,109 @@
 import os
 import sys
 import csv
-import requests
+import logging
 from datetime import datetime, timedelta
+from aiohttp import web
+import requests
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    print("❌ BOT_TOKEN not found.")
+# --- Логирование ---
+logging.basicConfig(level=logging.INFO)
+
+# --- Конфигурация ---
+try:
+    TOKEN = os.environ["BOT_TOKEN"]
+except KeyError:
+    print("❌ BOT_TOKEN not found in environment variables", file=sys.stderr)
     sys.exit(1)
 
-RAW_CSV_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/main/schedule.csv"
+WEBHOOK_PATH = "/"
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
+WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}" if RENDER_EXTERNAL_URL else None
 
-# ================= Команды =================
+SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/main/schedule.csv"
 
+# --- Чтение расписания ---
+async def fetch_schedule():
+    try:
+        response = requests.get(SCHEDULE_URL)
+        response.raise_for_status()
+        lines = response.text.strip().split("\n")
+        schedule = {}
+        for line in lines:
+            parts = line.strip().split(",", maxsplit=1)
+            if len(parts) == 2:
+                date_str, text = parts
+                schedule[date_str.strip()] = text.strip()
+        return schedule
+    except Exception as e:
+        logging.error(f"Не удалось получить расписание: {e}")
+        return {}
+
+# --- Команды ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Отъебись.")
 
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("pong")
 
-# ================= Парсинг расписания =================
-
-async def fetch_schedule():
-    try:
-        response = requests.get(RAW_CSV_URL)
-        lines = response.text.strip().splitlines()
-        return dict(line.split(",", 1) for line in lines if "," in line)
-    except Exception as e:
-        return {}
-
-def get_day(offset=0):
-    return (datetime.utcnow() + timedelta(days=offset)).date().isoformat()
-
 async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule = await fetch_schedule()
-    date = get_day(0)
-    reply = schedule.get(date, "График на сегодня не задан.")
-    await update.message.reply_text(f"📅 {date}\n{reply}")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    message = schedule.get(today_str, "Сегодня график не задан")
+    await update.message.reply_text(f"📅 Сегодня: {message}")
 
 async def tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule = await fetch_schedule()
-    date = get_day(1)
-    reply = schedule.get(date, "График на завтра не задан.")
-    await update.message.reply_text(f"📅 {date}\n{reply}")
+    tomorrow_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    message = schedule.get(tomorrow_str, "На завтра график не задан")
+    await update.message.reply_text(f"📅 Завтра: {message}")
 
 async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule = await fetch_schedule()
-    reply = ""
+    today = datetime.now()
+    lines = []
     for i in range(7):
-        date = get_day(i)
-        reply += f"📅 {date}\n{schedule.get(date, '—')}\n"
-    await update.message.reply_text(reply.strip())
+        date = today + timedelta(days=i)
+        date_str = date.strftime("%Y-%m-%d")
+        pretty = date.strftime("%d.%m (%a)")
+        text = schedule.get(date_str, "—")
+        lines.append(f"{pretty}: {text}")
+    await update.message.reply_text("\n".join(lines))
 
-# ================= Запуск =================
+# --- Веб-сервер ---
+async def handle(request):
+    try:
+        data = await request.json()
+        update = Update.de_json(data, app.bot)
+        await app.initialize()
+        await app.process_update(update)
+        return web.Response(text="ok")
+    except Exception as e:
+        logging.error(f"Ошибка обработки запроса: {e}")
+        return web.Response(status=500, text="error")
 
+# --- Запуск ---
 if __name__ == '__main__':
-    print("🚀 Бот запускается (polling)...")
-    app = ApplicationBuilder().token(TOKEN).build()
+    logging.info("🚀 Бот запускается через вебхук...")
 
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("ping", ping))
     app.add_handler(CommandHandler("today", today))
     app.add_handler(CommandHandler("tomorrow", tomorrow))
     app.add_handler(CommandHandler("week", week))
 
-    app.run_polling()
+    aio_app = web.Application()
+    aio_app.router.add_post(WEBHOOK_PATH, handle)
+
+    if WEBHOOK_URL:
+        try:
+            logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
+            app.bot.set_webhook(url=WEBHOOK_URL)
+        except Exception as e:
+            logging.error(f"Ошибка установки вебхука: {e}")
+
+    web.run_app(aio_app, port=10000)
