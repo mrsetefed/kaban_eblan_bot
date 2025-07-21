@@ -8,4 +8,5 @@ def get_handlers():
         CommandHandler("today", today),
         CommandHandler("tomorrow", tomorrow),
         CommandHandler("week", week),
+        CommandHandler("verify", verify),
     ]
