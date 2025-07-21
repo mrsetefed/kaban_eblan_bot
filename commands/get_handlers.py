@@ -1,0 +1,11 @@
+from telegram.ext import CommandHandler
+from . import start, ping, today, tomorrow, week
+
+def get_handlers():
+    return [
+        CommandHandler("start", start.start),
+        CommandHandler("ping", ping.ping),
+        CommandHandler("today", today.today),
+        CommandHandler("tomorrow", tomorrow.tomorrow),
+        CommandHandler("week", week.week),
+    ]

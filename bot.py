@@ -6,7 +6,7 @@ from aiohttp import web
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from commands import get_handlers
+from commands.get_handlers import get_handlers
 from utils import fetch_schedule
 
 # --- Логирование ---
