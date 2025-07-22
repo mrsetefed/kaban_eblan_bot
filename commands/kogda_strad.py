@@ -1,34 +1,30 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils import fetch_all_json_schedules, is_allowed
+from utils import is_allowed, fetch_selected_json_schedules
 
-ALLOWED_ROLES = ["GM"]
-USERS_TO_COMPARE = ["kiros", "nekit"]
+ALLOWED_ROLE = "GM"
+USERS_TO_CHECK = ["kiros", "nekit"]
 
 async def kogda_strad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if not is_allowed(user_id, ALLOWED_ROLES):
-        await update.message.reply_text("Ты недостаточно крут.")
+    user_id = str(update.effective_user.id)
+    if not is_allowed(user_id, [ALLOWED_ROLE]):
+        await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutotest")
         return
 
-    schedules = fetch_all_json_schedules()
-    
-    if not all(user in schedules for user in USERS_TO_COMPARE):
-        await update.message.reply_text("Не удалось загрузить все расписания.")
+    schedules = fetch_selected_json_schedules(USERS_TO_CHECK)
+    if not schedules:
+        await update.message.reply_text("Ошибка загрузки расписаний.")
         return
 
-    kiros_days = schedules["kiros"]
-    nekit_days = schedules["nekit"]
+    shared_dates = set(schedules[USERS_TO_CHECK[0]].keys())
+    for name in USERS_TO_CHECK[1:]:
+        shared_dates &= set(schedules[name].keys())
 
-    matching_days = []
-    for date, value in kiros_days.items():
-        if value == "+" and nekit_days.get(date) == "+":
-            matching_days.append(date)
+    available_days = [date for date in sorted(shared_dates)
+                      if all(schedules[user][date] == "+" for user in USERS_TO_CHECK)]
 
-    if matching_days:
-        message = "📅 Совпадающие даты:\n" + "\n".join(sorted(matching_days))
+    if available_days:
+        result = "\n".join(available_days)
+        await update.message.reply_text(f"🎲 Возможные даты для Страда:\n{result}")
     else:
-        message = "😞 Нет совпадающих дат."
-
-    await update.message.reply_text(message)
+        await update.message.reply_text("В страде отказано. Нет подходящих дат")

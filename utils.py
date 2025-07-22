@@ -31,13 +31,17 @@ USER_SCHEDULE_URLS = {
     "kaban": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/kaban.json"
 }
 
-def fetch_all_json_schedules():
+def fetch_selected_json_schedules(usernames):
     schedules = {}
-    for username, url in USER_SCHEDULE_URLS.items():
+    for username in usernames:
+        url = USER_SCHEDULE_URLS.get(username)
+        if not url:
+            logging.warning(f"Нет ссылки на расписание для пользователя: {username}")
+            continue
         try:
             response = requests.get(url)
             response.raise_for_status()
-            data = response.json()
+            data = response.json()  # ожидается {"2025-07-24": "+", ...}
             schedules[username] = data
         except Exception as e:
             logging.error(f"Не удалось загрузить расписание для {username}: {e}")

@@ -10,5 +10,5 @@ def get_handlers():
         CommandHandler("week", week.week),
         CommandHandler("verify",verify.verify),
         CommandHandler("krutometr",krutometr.krutometr),
-        CommandHandler("kogda_strad", kogda_strad),
+        CommandHandler("kogda_strad", kogda_strad)
     ]
