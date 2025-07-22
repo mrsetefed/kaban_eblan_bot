@@ -23,16 +23,16 @@ async def kogda_strad(update: Update, context: ContextTypes.DEFAULT_TYPE):
     available_days = [date for date in sorted(shared_dates)
                       if all(schedules[user][date] == "+" for user in USERS_TO_CHECK)]
 
-if available_days:
-    # Преобразуем YYYY-MM-DD в DD
-    options = [str(int(date.split("-")[2])) for date in available_days]
-    # Удаляем дубликаты и сортируем
-    options = sorted(set(options), key=int)
-    await update.message.reply_poll(
-        question="Когда играем?",
-        options=options,
-        is_anonymous=False,
-        allows_multiple_answers=True
-    )
-else:
-    await update.message.reply_text("В страде отказано. Нет подходящих дат")
+    if available_days:
+        # Преобразуем YYYY-MM-DD в DD
+        options = [str(int(date.split("-")[2])) for date in available_days]
+        # Удаляем дубликаты и сортируем
+        options = sorted(set(options), key=int)
+        await update.message.reply_poll(
+            question="Когда играем?",
+            options=options,
+            is_anonymous=False,
+            allows_multiple_answers=True
+        )
+    else:
+        await update.message.reply_text("В страде отказано. Нет подходящих дат")
