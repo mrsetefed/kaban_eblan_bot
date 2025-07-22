@@ -39,7 +39,7 @@ COMMENTS = [
     "Поздравляю, достигнута абсолютная крутость!"
 ]
 
-async def крутометр(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def krutometr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     score = random.randint(1, 100)
     index = min((score - 1) // 3, len(COMMENTS) - 1)
     comment = COMMENTS[index]
