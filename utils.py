@@ -21,7 +21,28 @@ async def fetch_schedule():
     except Exception as e:
         logging.error(f"Не удалось получить расписание: {e}")
         return {}
+     
 
+# --- Чтение всех расписаний из папки schedules ---
+USER_SCHEDULE_URLS = {
+    "nekit": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/nekit.json",
+    "kiros": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/kiros.json",
+    "amir": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/amir.json",
+    "kaban": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/kaban.json"
+}
+
+def fetch_all_json_schedules():
+    schedules = {}
+    for username, url in USER_SCHEDULE_URLS.items():
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            schedules[username] = data
+        except Exception as e:
+            logging.error(f"Не удалось загрузить расписание для {username}: {e}")
+    return schedules
+    
 # --- Работа с ролями из ENV ---
 def get_roles():
     try:
