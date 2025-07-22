@@ -9,5 +9,5 @@ def get_handlers():
         CommandHandler("tomorrow", tomorrow),
         CommandHandler("week", week),
         CommandHandler("verify", verify),
-        CommandHandler("крутометр", krutometr),
+        CommandHandler("krutometr", krutometr),
     ]
