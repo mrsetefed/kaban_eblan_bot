@@ -61,4 +61,11 @@ def get_user_role(user_id):
     return roles.get(str(user_id))
 
 def is_allowed(user_id, allowed_roles):
-    return get_user_role(user_id) in allowed_roles
+    user_roles = get_user_role(user_id)
+    # Приводим к списку если строка (например "admin"), иначе если None — пустой список
+    if isinstance(user_roles, str):
+        user_roles = [user_roles]
+    elif not isinstance(user_roles, list):
+        user_roles = []
+    # Теперь можно проверить, есть ли хотя бы одна роль в allowed_roles
+    return any(role in allowed_roles for role in user_roles)
