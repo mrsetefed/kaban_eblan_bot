@@ -3,13 +3,20 @@ import json
 import logging
 import requests
 import base64
+import time
 
 SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
 
 # --- Чтение расписания ---
 async def fetch_schedule():
     try:
-        response = requests.get(SCHEDULE_URL)
+        # Добавляем уникальный query string чтобы обойти кэш
+        url = SCHEDULE_URL + f"?_={int(time.time())}"
+        headers = {
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+        }
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         lines = response.text.strip().split("\n")
         schedule = {}
