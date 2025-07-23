@@ -13,7 +13,7 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Ошибка загрузки: {r.status_code}")
             return
         try:
-            schedule = json.loads(r.text)
+            schedule = json.loads(r.content.decode("utf-8"))
         except Exception:
             await update.message.reply_text("Ошибка чтения файла")
             return
