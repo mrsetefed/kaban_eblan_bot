@@ -1,5 +1,5 @@
 from telegram.ext import CommandHandler
-from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka
+from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week
 
 def get_handlers():
     return [
@@ -7,6 +7,8 @@ def get_handlers():
         CommandHandler("start", start.start),
         CommandHandler("ping", ping.ping),
         CommandHandler("today", today.today),
+        CommandHandler("tomorrow", tomorrow.tomorrow),
+        CommandHandler("week", week.week),
         CommandHandler("verify",verify.verify),
         CommandHandler("krutometr",krutometr.krutometr),
         CommandHandler("kogda_strad", kogda_strad.kogda_strad),
