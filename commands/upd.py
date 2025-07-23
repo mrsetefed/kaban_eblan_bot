@@ -99,6 +99,9 @@ async def upd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             schedule = json.loads(decoded)
         except Exception:
             schedule = {}
+            
+            today = datetime.now().strftime("%Y-%m-%d")
+            schedule = {date: status for date, status in schedule.items() if date >= today}
 
         for date_str, status in updates:
             schedule[date_str] = status

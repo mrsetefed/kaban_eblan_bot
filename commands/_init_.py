@@ -6,4 +6,6 @@ from .week import week
 from .verify import verify
 from .krutomer import krutometr
 from .kogda_strad import kogda_strad
+from .kogda_wd import kogda_wd
 from .upd import upd
+from .help import help

@@ -4,7 +4,7 @@ import logging
 import requests
 import base64
 
-SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/main/schedule.csv"
+SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
 
 # --- Чтение расписания ---
 async def fetch_schedule():
@@ -26,10 +26,11 @@ async def fetch_schedule():
 
 # --- Чтение всех расписаний из папки schedules ---
 USER_SCHEDULE_URLS = {
-    "nekit": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/nekit.json",
-    "kiros": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/kiros.json",
-    "amir": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/amir.json",
-    "kaban": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/test/schedules/kaban.json"
+    "nekit": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/nekit.json",
+    "kiros": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/kiros.json",
+    "amir": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/amir.json",
+    "kaban": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/kaban.json",
+    "andrey": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/andrey.json"
 }
 
 def fetch_selected_json_schedules(usernames):
