@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from commands.get_handlers import get_handlers
-from utils import fetch_schedule
+from utils import fetch_schedule_json
 
 # --- Логирование ---
 logging.basicConfig(level=logging.INFO)
