@@ -1,21 +1,29 @@
+import httpx
+import json
 from telegram import Update
 from telegram.ext import ContextTypes
-import requests
-from datetime import datetime
 
-SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"  # твой json
+# Укажи свой путь к файлу
+GITHUB_FILE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
 
 async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        response = requests.get(SCHEDULE_URL)
-        response.raise_for_status()
-        data = response.json()  # {"2025-07-24": "+", ...}
-
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        value = data.get(today_str, "Нет данных на сегодня")
-        text = f"{today_str} — {value}"
-
-        await update.message.reply_text(text)
-
+        async with httpx.AsyncClient() as client:
+            response = await client.get(GITHUB_FILE_URL, headers={"Cache-Control": "no-cache"})
+            response.raise_for_status()
+            schedule = response.json()
     except Exception as e:
-        await update.message.reply_text(f"Ошибка загрузки расписания: {e}")
+        await update.message.reply_text(f"Ошибка загрузки файла: {e}")
+        return
+
+    if not schedule:
+        await update.message.reply_text("Нет информации о графике.")
+        return
+
+    # Формируем красивый вывод
+    result_lines = []
+    for date, text in sorted(schedule.items()):
+        result_lines.append(f"{date}: {text}")
+
+    result = "\n".join(result_lines)
+    await update.message.reply_text(f"Полный график:\n\n{result}")
