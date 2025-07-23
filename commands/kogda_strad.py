@@ -8,7 +8,7 @@ USERS_TO_CHECK = ["kiros", "nekit"]
 async def kogda_strad(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     if not is_allowed(user_id, [ALLOWED_ROLE]):
-        await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutotest")
+        await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutometr")
         return
 
     schedules = fetch_selected_json_schedules(USERS_TO_CHECK)
@@ -28,11 +28,18 @@ async def kogda_strad(update: Update, context: ContextTypes.DEFAULT_TYPE):
         options = [str(int(date.split("-")[2])) for date in available_days]
         # Удаляем дубликаты и сортируем
         options = sorted(set(options), key=int)
-        await update.message.reply_poll(
-            question="Когда играем?",
-            options=options,
-            is_anonymous=False,
-            allows_multiple_answers=True
-        )
+
+        MAX_OPTIONS = 10
+        chunk_size = MAX_OPTIONS - 1
+
+        for i in range(0, len(options), chunk_size):
+            chunk = options[i:i + chunk_size]
+            poll_options = ["Ничего не подходит"] + chunk
+            await update.message.reply_poll(
+                question="Когда играем?",
+                options=poll_options,
+                is_anonymous=False,
+                allows_multiple_answers=True
+            )
     else:
         await update.message.reply_text("В страде отказано. Нет подходящих дат")
