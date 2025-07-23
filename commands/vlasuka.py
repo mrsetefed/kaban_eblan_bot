@@ -68,7 +68,7 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    file_path = f"{SCHEDULES_PATH}/{file_name}.json"
+    file_path = f"{SCHEDULES_PATH}/{setefed}.json"
     file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}?ref={SCHEDULES_BRANCH}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
