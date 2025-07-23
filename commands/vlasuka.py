@@ -1,6 +1,7 @@
 import os
 import httpx
 import json
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils import get_user_role
@@ -52,16 +53,6 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("У тебя нет доступа к изменению расписания. Проверь: /verify")
         return
 
-    # Определяем роль-файл
-    role = None
-    for r in roles:
-        if r in ["setefed"]:
-            role = r
-            break
-    if not role:
-        await update.message.reply_text("Ты кто бля? Нихуя не понятно, проверь /verify и скинь кабану")
-        return
-
     # Парсим аргументы
     try:
         entries = parse_args(context.args)
@@ -80,9 +71,9 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(
             "Используй формат:\n"
-            "/upd 8-1 свободен, 8-2 болею, 8-4 +\n"
+            "/vlasuka 8-1 свободен, 8-2 болею, 8-4 +\n"
             "или чтобы заполнить месяц целиком:\n"
-            "/upd 8 в отпуске\n"
+            "/vlasuka 8 в отпуске\n"
             "\nЭта команда запишет в твой график любые слова на нужные даты.\n"
             "Можно смешивать стили и отдельно добавлять даты после месяца!"
         )
@@ -135,27 +126,4 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"Спасибо, внес в расписание:\n\n{result}"
             )
-            # --- ОПОВЕЩЕНИЕ АДМИНОВ ---
-            from telegram.constants import ParseMode
-            from utils import get_roles
-            admin_ids = []
-            roles_dict = get_roles()
-            for uid, user_roles in roles_dict.items():
-                if user_id == uid:
-                    continue
-                if isinstance(user_roles, str) and user_roles == "admin" and role != "admin":
-                    admin_ids.append(uid)
-                if isinstance(user_roles, list) and "admin" in user_roles and role != "admin":
-                    admin_ids.append(uid)
-            if role != "admin":
-                for admin_id in set(admin_ids):
-                    try:
-                        await context.bot.send_message(
-                            chat_id=int(admin_id),
-                            text=f"Пользователь {role} обновил расписание.",
-                            parse_mode=ParseMode.HTML
-                        )
-                    except Exception:
-                        pass
-        else:
             await update.message.reply_text(f"Ошибка обновления: {r2.status_code} {r2.text}")
