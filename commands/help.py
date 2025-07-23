@@ -28,7 +28,7 @@ HELP_TEXT_VLAS = (
     "График я обновляю постоянно +, так что должен быть актуальный. День \"обновляется\" у него в 7 утра по твоим."
 )
 
-async def help_command(update, context):
+async def help(update, context):
     user_id = str(update.effective_user.id)
     from utils import get_user_role  # если не импортирован заранее
 
