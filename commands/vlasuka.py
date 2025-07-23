@@ -1,10 +1,8 @@
 import os
 import httpx
 import json
-
 from telegram import Update
 from telegram.ext import ContextTypes
-from utils import get_user_role
 import base64
 from datetime import datetime
 
@@ -14,10 +12,6 @@ SCHEDULES_BRANCH = "schedule"
 SCHEDULES_PATH = "schedules"
 
 def parse_args(args):
-    """
-    Парсит аргументы из команды /upd
-    Поддерживает: /upd 8-1 свободен, 8-2 болею, 8-4 +, 8-5 -
-    """
     entries = []
     text = " ".join(args)
     for part in text.split(","):
@@ -30,12 +24,10 @@ def parse_args(args):
             status_token = " ".join(tokens[1:])
             entries.append((date_token, status_token))
         elif len(tokens) >= 2:
-            # /upd 8 свободен
             month_token = tokens[0]
             status_token = " ".join(tokens[1:])
             entries.append((month_token, status_token))
         else:
-            # fallback на старый стиль 8-1+ или 8-1-
             if "-" in part and (part[-1] == "+" or part[-1] == "-"):
                 d, s = part[:-1], part[-1]
                 entries.append((d, s))
@@ -47,13 +39,10 @@ def expand_month(month, status):
     return [(f"2025-{int(month):02d}-{d:02d}", status) for d in range(1, days+1)]
 
 async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    roles = get_user_role(user_id)
-    if not roles:
-        await update.message.reply_text("У тебя нет доступа к изменению расписания. Проверь: /verify")
-        return
-
-    # Парсим аргументы
+    # *** убрали всю проверку ролей и выбор файла по роли ***
+    # Теперь всегда работаем с файлом vlasuka.json
+    file_name = "vlasuka"  # <-- тут имя твоего файла (без .json)
+    
     try:
         entries = parse_args(context.args)
         updates = []
@@ -79,7 +68,7 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    file_path = f"{SCHEDULES_PATH}/{role}.json"
+    file_path = f"{SCHEDULES_PATH}/{file_name}.json"
     file_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}?ref={SCHEDULES_BRANCH}"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -100,11 +89,9 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             schedule = {}
 
-        # (опционально) очищаем от старых дат (пример)
         today = datetime.now().strftime("%Y-%m-%d")
         schedule = {date: text for date, text in schedule.items() if date >= today}
 
-        # Вносим обновления
         for date_str, status in updates:
             schedule[date_str] = status
 
@@ -112,7 +99,7 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
             json.dumps(schedule, ensure_ascii=False, indent=2).encode("utf-8")
         ).decode("utf-8")
 
-        commit_msg = f"update {role} schedule"
+        commit_msg = f"update vlasuka schedule"
         update_data = {
             "message": commit_msg,
             "content": new_content,
@@ -126,4 +113,5 @@ async def vlasuka(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"Спасибо, внес в расписание:\n\n{result}"
             )
+        else:
             await update.message.reply_text(f"Ошибка обновления: {r2.status_code} {r2.text}")
