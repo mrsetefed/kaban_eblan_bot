@@ -5,19 +5,14 @@ import requests
 import base64
 import time
 
+
 SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
 
-async def fetch_schedule():
+async def fetch_schedule_json():
     try:
-        # Добавляем "костыль" для обхода кэша GitHub (добавляем уникальный GET-параметр)
-        url = SCHEDULE_URL + f"?_={int(time.time())}"
-        headers = {
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache"
-        }
-        response = requests.get(url, headers=headers)
+        response = requests.get(SCHEDULE_URL)
         response.raise_for_status()
-        return response.json()  
+        return response.json()
     except Exception as e:
         logging.error(f"Не удалось получить расписание: {e}")
         return {}
