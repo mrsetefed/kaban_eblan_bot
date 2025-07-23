@@ -5,7 +5,7 @@ import requests
 import base64
 import time
 
-SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/schedule/schedules/setefed.json"
+SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
 
 async def fetch_schedule():
     try:
