@@ -1,4 +1,4 @@
-from utils import fetch_schedule
+from utils import fetch_schedule_json
 from datetime import datetime, timedelta
 
 async def tomorrow(update, context):
