@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 from utils import is_allowed, fetch_selected_json_schedules
 
 ALLOWED_ROLE = "GM"
-USERS_TO_CHECK = ["kaban", "nekit", "andrey"]
+USERS_TO_CHECK = ["kaban", "nekit", "andrey", "hench"]
 
 async def kogda_wd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)

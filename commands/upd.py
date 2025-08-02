@@ -46,7 +46,7 @@ async def upd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Определяем роль-файл
     role = None
     for r in roles:
-        if r in ["nekit", "kiros", "amir", "kaban", "andrey"]:
+        if r in ["nekit", "kiros", "hench", "kaban", "andrey"]:
             role = r
             break
     if not role:
