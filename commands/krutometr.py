@@ -55,7 +55,7 @@ async def krutometr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, есть ли результат за сегодня
     if user_id in user_results:
         saved_date, saved_score, saved_comment = user_results[user_id]
-        message = f"Твой уровень крутости: *{saved_score}%*\n{saved_comment}"
+        message = f"Твой уровень крутости на сегодня: *{saved_score}%*\n{saved_comment}"
         await update.message.reply_text(message, parse_mode="Markdown")
         return
 
