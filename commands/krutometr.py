@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -31,18 +32,40 @@ COMMENTS = [
     "Ты даже можешь выдавать титулы всем, кто не участвует в клубе",
     "Еблобот одобряет.",
     "Пройден порог крутости обычного человека, теперь ты воистину КРУТОЙ, поздравляю.",
-    "Не забудь зайти на бесплатную раздачу кириешек",
+    "Тебе доступна бесплатная раздача кириешек, не забудь зайти.",
     "🧌",
     "Огромный хуй большие яйца",
-    "Тебе нужно больше тренироваться.",
-    "Еще немного...",
+    "Осталось совсем немного. Тебе нужно больше тренироваться.",
+    "Еще совсем чуть чуть...",
     "Поздравляю, достигнута абсолютная крутость!"
 ]
 
+# Память на время работы бота
+user_results = {}
+
 async def krutometr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
+    # Чистим старые записи (оставляем только сегодняшние)
+    to_delete = [uid for uid, (date, _, _) in user_results.items() if date != today_str]
+    for uid in to_delete:
+        del user_results[uid]
+
+    # Проверяем, есть ли результат за сегодня
+    if user_id in user_results:
+        saved_date, saved_score, saved_comment = user_results[user_id]
+        message = f"Твой уровень крутости: *{saved_score}%*\n{saved_comment}"
+        await update.message.reply_text(message, parse_mode="Markdown")
+        return
+
+    # Если нет — генерируем новый
     score = random.randint(1, 100)
     index = min((score - 1) // 3, len(COMMENTS) - 1)
     comment = COMMENTS[index]
-    
+
+    # Сохраняем в память
+    user_results[user_id] = (today_str, score, comment)
+
     message = f"Твой уровень крутости: *{score}%*\n{comment}"
     await update.message.reply_text(message, parse_mode="Markdown")
