@@ -49,7 +49,7 @@ async def upd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     role = None
     for r in roles:
-        if r in ["nekit", "kiros", "hench", "kaban", "andrey", "admin"]:  # FIX: пусть admin тоже можно
+        if r in ["nekit", "kiros", "hench", "kaban", "andrey"]:  # FIX: пусть admin тоже можно
             role = r
             break
     if not role:
