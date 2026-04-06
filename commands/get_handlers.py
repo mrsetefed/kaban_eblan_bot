@@ -15,5 +15,5 @@ def get_handlers():
         CommandHandler("kogda_wd", kogda_wd.kogda_wd),
         CommandHandler("vlasuka", vlasuka.vlasuka),
         CommandHandler("upd", upd.upd),
-        CommandHandler("kogda_kamputer" kogda_kamputer.kogda_kamputer)
+        CommandHandler("kogda_kamputer", kogda_kamputer.kogda_kamputer)
     ]
