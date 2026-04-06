@@ -42,4 +42,4 @@ async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 allows_multiple_answers=True
             )
     else:
-        await update.message.reply_text("А хуй вам, в поиграть отказано. Нет подходящих дат")
+        await update.message.reply_text("А хуй вам, в поиграть отказано. Нет дополнительных дат, играем как обычно")

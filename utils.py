@@ -24,8 +24,8 @@ USER_SCHEDULE_URLS = {
     "hench": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/hench.json",
     "kaban": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/kaban.json",
     "setefed": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json",
-    "ilya": "https://github.com/mrsetefed/kaban_eblan_bot/blob/schedule/schedules/Ilya.json",
-    "panda": "https://github.com/mrsetefed/kaban_eblan_bot/blob/schedule/schedules/panda.json"    
+    "ilya": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/Ilya.json",
+    "panda": "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/panda.json"    
 }
 
 def fetch_selected_json_schedules(usernames):
