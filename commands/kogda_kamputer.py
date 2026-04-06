@@ -3,15 +3,10 @@ from telegram.ext import ContextTypes
 from utils import is_allowed, fetch_selected_json_schedules
 
 ALLOWED_ROLE = "GM"
-USERS_TO_CHECK = ["nekit", "kaban", "panda", "ilya", "hench"]
+USERS_TO_CHECK = ["nekit", "kaban", "panda", "hench"]
 
 async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.effective_user.id)
-    if not is_allowed(user_id, [ALLOWED_ROLE]):
-        await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutometr")
-        return
-
-    schedules = fetch_selected_json_schedules(USERS_TO_CHECK)
+   schedules = fetch_selected_json_schedules(USERS_TO_CHECK)
     if not schedules:
         await update.message.reply_text("Ошибка загрузки расписаний.")
         return
