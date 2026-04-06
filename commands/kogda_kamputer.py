@@ -2,11 +2,11 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from utils import is_allowed, fetch_selected_json_schedules
 
-ALLOWED_ROLE = "GM", "ilya", "panda", "nekit"
+ALLOWED_ROLE = "GM", "panda", "nekit"
 USERS_TO_CHECK = ["nekit", "kaban", "panda", "hench"]
 
 async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-   user_id = str(update.effective_user.id)
+    user_id = str(update.effective_user.id)
     if not is_allowed(user_id, [ALLOWED_ROLE]):
         await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutometr")
         return
