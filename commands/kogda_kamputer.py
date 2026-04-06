@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from utils import is_allowed, fetch_selected_json_schedules
 
-ALLOWED_ROLE = ["GM", "panda", "nekit", "kapo"]
+ALLOWED_ROLE = "GM"; "panda"; "nekit"; "kapo"
 USERS_TO_CHECK = ["nekit", "kaban", "panda", "hench", "kapo"]
 
 async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
