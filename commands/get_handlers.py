@@ -1,4 +1,4 @@
-from telegram.ext import CommandHandler, PollAnswerHandler
+from telegram.ext import CallbackQueryHandler, CommandHandler, PollAnswerHandler
 from . import poll_tracker, krutometr_stats, roll, quote, skoro
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
@@ -23,5 +23,6 @@ def get_handlers():
         CommandHandler("quote", quote.quote),
         CommandHandler("skoro", skoro.skoro),
         CommandHandler("top", krutometr_stats.top),
-        PollAnswerHandler(poll_tracker.on_poll_answer)
+        PollAnswerHandler(poll_tracker.on_poll_answer),
+        CallbackQueryHandler(upd.upd_callback, pattern=r"^u\|")
     ]
