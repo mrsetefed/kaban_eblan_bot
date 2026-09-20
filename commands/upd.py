@@ -208,19 +208,20 @@ def read_mask(schedule: dict, year: int, month: int, days: list) -> int:
     return sum(1 << (d - 1) for d in days if schedule.get(date(year, month, d).isoformat()) == "+")
 
 
-def cb(*parts) -> str:
-    return "|".join(["u", *map(str, parts)])
+def cb(*parts, prefix: str = "u") -> str:
+    """callback_data кнопки. Префикс отделяет команды друг от друга: u для /upd, v для /vlasuka."""
+    return "|".join([prefix, *map(str, parts)])
 
 
-def picker_markup(owner: int, today: date) -> InlineKeyboardMarkup:
+def picker_markup(owner: int, today: date, prefix: str = "u") -> InlineKeyboardMarkup:
     cur = (today.year, today.month)
     nxt = add_months(*cur, 1)
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(f"Текущий: {MONTHS_NOMINATIVE[cur[1] - 1]}", callback_data=cb("m", owner, month_key(*cur))),
-            InlineKeyboardButton(f"Следующий: {MONTHS_NOMINATIVE[nxt[1] - 1]}", callback_data=cb("m", owner, month_key(*nxt))),
+            InlineKeyboardButton(f"Текущий: {MONTHS_NOMINATIVE[cur[1] - 1]}", callback_data=cb("m", owner, month_key(*cur), prefix=prefix)),
+            InlineKeyboardButton(f"Следующий: {MONTHS_NOMINATIVE[nxt[1] - 1]}", callback_data=cb("m", owner, month_key(*nxt), prefix=prefix)),
         ],
-        [InlineKeyboardButton("Отменить", callback_data=cb("x", owner))],
+        [InlineKeyboardButton("Отменить", callback_data=cb("x", owner, prefix=prefix))],
     ])
 
 
@@ -228,30 +229,39 @@ def days_text(year: int, month: int) -> str:
     return f"Меняй что нужно ({MONTHS_NOMINATIVE[month - 1]} {year})\n{CHECK} можешь играть, {CROSS} занят"
 
 
-def days_markup(owner: int, year: int, month: int, current: int, initial: int, today: date) -> InlineKeyboardMarkup:
-    """Календарь месяца: дни недели сверху, дни лежат в своих колонках. Состояние (маски) хранится в самих кнопках."""
-    editable = set(editable_days(year, month, today))
-    key = month_key(year, month)
+def calendar_rows(year: int, month: int, editable: set, day_button, noop: str = NOOP) -> list:
+    """Сетка месяца: дни недели сверху, дни лежат в своих колонках, недоступные клетки пустые.
+    day_button(день) возвращает кнопку для доступного дня."""
+    rows = [[InlineKeyboardButton(name, callback_data=noop) for name in WEEKDAYS]]
     last = calendar.monthrange(year, month)[1]
-
-    rows = [[InlineKeyboardButton(name, callback_data=NOOP) for name in WEEKDAYS]]
     cells = [None] * date(year, month, 1).weekday() + list(range(1, last + 1))
     cells += [None] * (-len(cells) % 7)
     for start in range(0, len(cells), 7):
-        row = []
-        for day in cells[start:start + 7]:
-            if day is None or day not in editable:
-                row.append(InlineKeyboardButton(" ", callback_data=NOOP))
-            else:
-                mark = CHECK if (current >> (day - 1)) & 1 else CROSS
-                row.append(InlineKeyboardButton(
-                    f"{day}{mark}", callback_data=cb("t", owner, key, f"{current:x}", f"{initial:x}", day)
-                ))
-        rows.append(row)
+        rows.append([
+            InlineKeyboardButton(" ", callback_data=noop) if day is None or day not in editable else day_button(day)
+            for day in cells[start:start + 7]
+        ])
+    return rows
 
+
+def days_markup(
+    owner: int, year: int, month: int, current: int, initial: int, today: date, prefix: str = "u", extra_rows=()
+) -> InlineKeyboardMarkup:
+    """Календарь месяца с ✅ и ❌. Состояние (маски) хранится в самих кнопках.
+    extra_rows: дополнительные ряды кнопок перед строкой «Назад / Сохранить»."""
+    key = month_key(year, month)
+
+    def day_button(day):
+        mark = CHECK if (current >> (day - 1)) & 1 else CROSS
+        return InlineKeyboardButton(
+            f"{day}{mark}", callback_data=cb("t", owner, key, f"{current:x}", f"{initial:x}", day, prefix=prefix)
+        )
+
+    rows = calendar_rows(year, month, set(editable_days(year, month, today)), day_button, f"{prefix}|n")
+    rows.extend(extra_rows)
     rows.append([
-        InlineKeyboardButton("Назад", callback_data=cb("b", owner)),
-        InlineKeyboardButton("Сохранить", callback_data=cb("s", owner, key, f"{current:x}", f"{initial:x}")),
+        InlineKeyboardButton("Назад", callback_data=cb("b", owner, prefix=prefix)),
+        InlineKeyboardButton("Сохранить", callback_data=cb("s", owner, key, f"{current:x}", f"{initial:x}", prefix=prefix)),
     ])
     return InlineKeyboardMarkup(rows)
 

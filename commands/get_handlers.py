@@ -21,11 +21,15 @@ def get_handlers():
         CommandHandler("mog", mog.mog),
         CommandHandler("roll", roll.roll),
         CommandHandler("quote", quote.quote),
+        CommandHandler("unquote", quote.unquote),
         CommandHandler("skoro", skoro.skoro),
         CommandHandler("top", krutometr_stats.top),
         CommandHandler("taro", taro.taro),
         PollAnswerHandler(poll_tracker.on_poll_answer),
         CallbackQueryHandler(upd.upd_callback, pattern=r"^u\|"),
+        CallbackQueryHandler(vlasuka.vlasuka_callback, pattern=r"^v\|"),
+        # ответ владельца календаря на запрос комментария; чужие сообщения фильтр не пропускает, они идут дальше
+        MessageHandler(vlasuka.PENDING_REPLY, vlasuka.on_comment_reply),
         # 🎰 кубиком, стикером-эмодзи или просто текстом (с невидимым селектором или без)
         MessageHandler(slot.SLOT_MESSAGE, slot.react)
     ]
