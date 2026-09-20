@@ -37,6 +37,13 @@ async def handle(request):
         return web.Response(status=500, text="error")
 
 
+# --- Ошибки в командах: пишем в лог и отвечаем, чтобы не было тишины ---
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logging.error("Ошибка в обработчике", exc_info=context.error)
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text("Что-то сломалось, скинь ошибку кабану.")
+
+
 # --- Основной запуск ---
 async def main():
     global app
@@ -46,6 +53,7 @@ async def main():
 
     for handler in get_handlers():
         app.add_handler(handler)
+    app.add_error_handler(on_error)
 
     if WEBHOOK_URL:
         try:
