@@ -41,6 +41,42 @@
           ]
         }
       }
+    },
+    "5298771612013698700": {
+      "chat_id": -5438968535,
+      "command": "kogda_dnd",
+      "note": null,
+      "created_at": "2026-09-20T21:06:59.493473+00:00",
+      "next_check_at": "2026-09-21T12:52:56.745350+00:00",
+      "stage": 0,
+      "done": false,
+      "failures": 0,
+      "participants": {
+        "463045227": "kaban",
+        "1759322833": "nekit"
+      },
+      "unresolved": [
+        "ilya",
+        "amir",
+        "ksusha"
+      ],
+      "polls": [
+        {
+          "poll_id": "5298771612013698700",
+          "message_id": 13727,
+          "options": [
+            "Ничего не подходит",
+            "21",
+            "25"
+          ],
+          "dates": [
+            null,
+            "2026-09-21",
+            "2026-09-25"
+          ]
+        }
+      ],
+      "answers": {}
     }
   },
   "users": {
