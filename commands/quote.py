@@ -1,4 +1,5 @@
 import html
+import logging
 import random
 from datetime import datetime, timedelta, timezone
 
@@ -74,7 +75,12 @@ async def save_quote(update: Update, replied):
             quotes.append(quote)
             outcome.update(result="saved", number=len(quotes))
 
-    await store.mutate(add)
+    try:
+        await store.mutate(add)
+    except Exception as e:
+        logging.exception("Не удалось сохранить цитату")
+        await update.message.reply_text(f"Не смог сохранить цитату: хранилище недоступно ({str(e)[:150]})")
+        return
 
     if outcome["result"] == "duplicate":
         await update.message.reply_text("Эта цитата уже есть в цитатнике.")
@@ -87,7 +93,12 @@ async def save_quote(update: Update, replied):
 
 
 async def random_quote(update: Update):
-    data = await get_store().read()
+    try:
+        data = await get_store().read()
+    except Exception as e:
+        logging.exception("Не удалось прочитать цитатник")
+        await update.message.reply_text(f"Не смог открыть цитатник: хранилище недоступно ({str(e)[:150]})")
+        return
     quotes = data.get("chats", {}).get(str(update.effective_chat.id), [])
     if not quotes:
         await update.message.reply_text(

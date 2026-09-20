@@ -9,6 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from commands.get_handlers import get_handlers
 from commands.jobs import process_all
 from commands.poll_tracker import handle_tick
+from poll_store import check_storage
 from utils import fetch_schedule_json
 
 # --- Логирование ---
@@ -26,11 +27,36 @@ RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
 WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}" if RENDER_EXTERNAL_URL else None
 
 
+# Какие события Telegram присылает боту. Задаём явно: если не указать, Telegram оставляет прежнюю настройку.
+ALLOWED_UPDATES = ["message", "callback_query", "poll_answer"]
+
+
+def describe_update(update: Update) -> str:
+    """Что пришло боту, без текста сообщений: для диагностики в логах."""
+    if update.poll_answer:
+        return "poll_answer"
+    if update.callback_query:
+        return "callback_query"
+    message = update.effective_message
+    if not message:
+        return "другое событие"
+    if message.dice:
+        kind = f"кубик {message.dice.emoji}"
+    elif message.sticker:
+        kind = f"стикер {message.sticker.emoji}"
+    elif message.text:
+        kind = "команда" if message.text.startswith("/") else "текст"
+    else:
+        kind = "прочее"
+    return f"сообщение ({message.chat.type}): {kind}"
+
+
 # --- HTTP обработка запросов от Telegram ---
 async def handle(request):
     try:
         data = await request.json()
         update = Update.de_json(data, app.bot)
+        logging.info("Апдейт: %s", describe_update(update))
         await app.initialize()
         await app.process_update(update)
         return web.Response(text="ok")
@@ -63,7 +89,13 @@ async def due_check_loop():
         await asyncio.sleep(DUE_CHECK_INTERVAL)
 
 
+async def report_storage():
+    # одна строка в логах при каждом запуске: сразу видно, работает ли запись состояния в GitHub
+    logging.info(await check_storage())
+
+
 async def start_background(aio_app):
+    aio_app["storage_report"] = asyncio.create_task(report_storage())
     aio_app["due_check_loop"] = asyncio.create_task(due_check_loop())
 
 
@@ -91,7 +123,7 @@ async def main():
 
     if WEBHOOK_URL:
         try:
-            await app.bot.set_webhook(url=WEBHOOK_URL)
+            await app.bot.set_webhook(url=WEBHOOK_URL, allowed_updates=ALLOWED_UPDATES)
             logging.info(f"✅ Webhook установлен: {WEBHOOK_URL}")
         except Exception as e:
             logging.error(f"Ошибка установки вебхука: {e}")

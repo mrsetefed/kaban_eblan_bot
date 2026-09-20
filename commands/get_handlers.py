@@ -1,4 +1,4 @@
-from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler, filters
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler
 from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
@@ -25,7 +25,6 @@ def get_handlers():
         CommandHandler("top", krutometr_stats.top),
         PollAnswerHandler(poll_tracker.on_poll_answer),
         CallbackQueryHandler(upd.upd_callback, pattern=r"^u\|"),
-        # 🎰 анимацией (так его шлёт обычный клиент) или просто текстом; пересланные не считаем
-        MessageHandler(filters.Dice.SLOT_MACHINE & ~filters.FORWARDED, slot.react),
-        MessageHandler(filters.TEXT & filters.Regex(r"^\s*🎰\s*$") & ~filters.FORWARDED, slot.react)
+        # 🎰 кубиком, стикером-эмодзи или просто текстом (с невидимым селектором или без)
+        MessageHandler(slot.SLOT_MESSAGE, slot.react)
     ]

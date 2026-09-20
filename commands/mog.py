@@ -125,7 +125,8 @@ def score_tier(score: float, scale=TIER_SCALE) -> str:
 # Чтобы мемные результаты выпадали чаще, у каждого броска есть «сдвиг» в баллах: в плюс, в минус или ноль.
 # Сдвиг применяется к исходным значениям (PSL, угол челюсти, веса вариантов и т.д.), а не к итоговому числу,
 # поэтому значения в блоках и их тиры остаются согласованными.
-EXTREME_CHANCE = 0.70   # шанс, что результат уйдёт в крайность (примерно 70+ или 40-), иначе всё как обычно
+HIGH_CHANCE = 0.25      # шанс сдвига вверх (получается CHAD и выше)
+LOW_CHANCE = 0.35       # шанс сдвига вниз (получается SUB-3 и около). Остальное: обычный бросок без сдвига
 HIGH_SHIFT = 25         # средний сдвиг «вверх»
 LOW_SHIFT = 24          # средний сдвиг «вниз»
 SHIFT_SPREAD = 7        # разброс сдвига, чтобы крайности не были одинаковыми
@@ -169,10 +170,11 @@ def strong_roll_share(user_id, username):
 
 
 def pick_shift(rng: random.Random) -> float:
-    """Общая подкрутка для всех: чаще крайности (примерно 70+ или 40-)."""
-    if rng.random() < EXTREME_CHANCE:
-        if rng.random() < 0.5:
-            return rng.gauss(HIGH_SHIFT, SHIFT_SPREAD)
+    """Общая подкрутка для всех: чаще крайности, вниз чуть чаще, чем вверх."""
+    roll = rng.random()
+    if roll < HIGH_CHANCE:
+        return rng.gauss(HIGH_SHIFT, SHIFT_SPREAD)
+    if roll < HIGH_CHANCE + LOW_CHANCE:
         return rng.gauss(-LOW_SHIFT, SHIFT_SPREAD)
     return 0.0
 
