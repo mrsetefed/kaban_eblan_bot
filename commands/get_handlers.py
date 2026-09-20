@@ -1,5 +1,6 @@
-from telegram.ext import CommandHandler
-from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd
+from telegram.ext import CommandHandler, PollAnswerHandler
+from . import poll_tracker
+from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
     return [
@@ -16,5 +17,7 @@ def get_handlers():
         CommandHandler("vlasuka", vlasuka.vlasuka),
         CommandHandler("upd", upd.upd),
         CommandHandler("kogda_kamputer", kogda_kamputer.kogda_kamputer),
-        CommandHandler("kogda_dnd", kogda_dnd.kogda_dnd)
+        CommandHandler("kogda_dnd", kogda_dnd.kogda_dnd),
+        CommandHandler("mog", mog.mog),
+        PollAnswerHandler(poll_tracker.on_poll_answer)
     ]

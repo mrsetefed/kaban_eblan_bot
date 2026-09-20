@@ -2,8 +2,11 @@ from datetime import date, datetime, timedelta, timezone
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils import is_allowed
+from .poll_tracker import send_date_polls
 
 ALLOWED_ROLE = "GM"
+# Роли игроков в USER_ROLES: по ним бот находит telegram id, чтобы следить за голосованием и тегать
+PLAYERS = ["kaban", "nekit", "ilya", "amir", "ksusha"]
 MSK = timezone(timedelta(hours=3))
 
 # Опорные даты для циклических правил. Это реальные календарные даты,
@@ -58,15 +61,4 @@ async def kogda_dnd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     options = [str(d.day) for d in available_days]
 
-    MAX_OPTIONS = 10
-    chunk_size = MAX_OPTIONS - 1  # -1 под "Ничего не подходит"
-
-    for i in range(0, len(options), chunk_size):
-        chunk = options[i:i + chunk_size]
-        poll_options = ["Ничего не подходит"] + chunk
-        await update.message.reply_poll(
-            question="Когда играем?",
-            options=poll_options,
-            is_anonymous=False,
-            allows_multiple_answers=True
-        )
+    await send_date_polls(update, options, PLAYERS, "kogda_dnd")

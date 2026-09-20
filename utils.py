@@ -4,6 +4,7 @@ import logging
 import requests
 import base64
 import time
+import html
 
 
 SCHEDULE_URL = "https://raw.githubusercontent.com/mrsetefed/kaban_eblan_bot/refs/heads/schedule/schedules/setefed.json"
@@ -46,6 +47,13 @@ def fetch_selected_json_schedules(usernames):
             logging.error(f"Не удалось загрузить расписание для {username}: {e}")
     return schedules
     
+# --- Обращение к человеку в HTML-сообщениях ---
+def mention_html(user):
+    """@username, если ник есть, иначе кликабельное упоминание по имени (работает и без ника)."""
+    if user.username:
+        return f"@{html.escape(user.username)}"
+    return f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
+
 # --- Работа с ролями из ENV ---
 def get_roles():
     try:

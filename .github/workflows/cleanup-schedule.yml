@@ -1,0 +1,52 @@
+# Раз в месяц сжимает историю ветки schedule в один коммит, чтобы она не разрасталась от записей бота.
+# Все файлы (schedules/*.json, state/polls.json) остаются как есть, пропадает только история изменений.
+# Работает только из ветки по умолчанию (main). Проверить руками: вкладка Actions, Squash schedule branch, Run workflow.
+name: Squash schedule branch
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"   # 1-го числа каждого месяца в 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  squash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout schedule branch
+        uses: actions/checkout@v4
+        with:
+          ref: schedule
+          fetch-depth: 2
+
+      - name: Squash history
+        run: |
+          set -eu
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch --quiet --depth=2 origin schedule
+            git checkout --quiet --detach FETCH_HEAD
+            if ! git rev-parse --quiet --verify HEAD^ > /dev/null; then
+              echo "В ветке schedule уже один коммит, чистить нечего"
+              exit 0
+            fi
+            expected=$(git rev-parse HEAD)
+            echo "Файлов в ветке: $(git ls-files | wc -l)"
+            git checkout --quiet --orphan squashed
+            git add -A
+            git commit --quiet -m "Squash schedule history $(date -u +%F)"
+            # lease: если бот успел записать в ветку во время чистки, пуш отклонится и мы начнём заново, ничего не потеряв
+            if git push --force-with-lease="schedule:${expected}" origin squashed:schedule; then
+              echo "Готово: история ветки schedule сжата до одного коммита"
+              exit 0
+            fi
+            echo "Ветка изменилась во время чистки (попытка $attempt), пробую снова"
+            git checkout --quiet --force --detach "$expected"
+            git branch --quiet -D squashed
+            sleep 20
+          done
+          echo "Не удалось сжать ветку за 3 попытки, запусти вручную позже"
+          exit 1

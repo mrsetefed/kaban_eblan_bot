@@ -1,6 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils import is_allowed, fetch_selected_json_schedules
+from .poll_tracker import send_date_polls
 
 ALLOWED_ROLES = ["GM", "panda", "nekit", "kapo"]
 USERS_TO_CHECK = ["nekit", "kaban", "panda", "hench", "kapo"]
@@ -30,17 +31,6 @@ async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Удаляем дубликаты и сортируем
         options = sorted(set(options), key=int)
 
-        MAX_OPTIONS = 10
-        chunk_size = MAX_OPTIONS - 1
-
-        for i in range(0, len(options), chunk_size):
-            chunk = options[i:i + chunk_size]
-            poll_options = ["Ничего не подходит"] + chunk
-            await update.message.reply_poll(
-                question="Когда играем?",
-                options=poll_options,
-                is_anonymous=False,
-                allows_multiple_answers=True
-            )
+        await send_date_polls(update, options, USERS_TO_CHECK, "kogda_kamputer")
     else:
         await update.message.reply_text("А хуй вам, отказано. Дополнительных дат нет, играем как обычно")
