@@ -1,5 +1,5 @@
 from telegram.ext import CommandHandler, PollAnswerHandler
-from . import poll_tracker
+from . import poll_tracker, krutometr_stats, roll, quote, skoro
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
@@ -19,5 +19,9 @@ def get_handlers():
         CommandHandler("kogda_kamputer", kogda_kamputer.kogda_kamputer),
         CommandHandler("kogda_dnd", kogda_dnd.kogda_dnd),
         CommandHandler("mog", mog.mog),
+        CommandHandler("roll", roll.roll),
+        CommandHandler("quote", quote.quote),
+        CommandHandler("skoro", skoro.skoro),
+        CommandHandler("top", krutometr_stats.top),
         PollAnswerHandler(poll_tracker.on_poll_answer)
     ]

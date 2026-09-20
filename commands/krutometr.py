@@ -9,6 +9,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from utils import mention_html
+from .krutometr_stats import record_roll
 
 MSK = timezone(timedelta(hours=3))
 
@@ -281,6 +282,11 @@ async def krutometr(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = roll(author.id, today)
         text = format_result(mention_html(author), result["score"], result["phrase"])
         await send_result(update, text, result["media"])
+        try:
+            # запись нужна для топа недели, поэтому сбой хранилища не должен ломать сам ответ
+            await record_roll(update, result["score"], today)
+        except Exception:
+            logging.exception("Не удалось записать результат крутометра")
         return
 
     if target.is_bot:

@@ -30,6 +30,9 @@ async def kogda_strad(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Удаляем дубликаты и сортируем
         options = sorted(set(options), key=int)
 
-        await send_date_polls(update, options, USERS_TO_CHECK, "kogda_strad")
+        option_dates = {}
+        for day in available_days:
+            option_dates.setdefault(str(int(day.split("-")[2])), day)
+        await send_date_polls(update, options, USERS_TO_CHECK, "kogda_strad", option_dates)
     else:
         await update.message.reply_text("В страде отказано. Нет подходящих дат")

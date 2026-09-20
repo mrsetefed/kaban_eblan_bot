@@ -31,6 +31,9 @@ async def kogda_kamputer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Удаляем дубликаты и сортируем
         options = sorted(set(options), key=int)
 
-        await send_date_polls(update, options, USERS_TO_CHECK, "kogda_kamputer")
+        option_dates = {}
+        for day in available_days:
+            option_dates.setdefault(str(int(day.split("-")[2])), day)
+        await send_date_polls(update, options, USERS_TO_CHECK, "kogda_kamputer", option_dates)
     else:
         await update.message.reply_text("А хуй вам, отказано. Дополнительных дат нет, играем как обычно")

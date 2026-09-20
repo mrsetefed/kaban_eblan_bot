@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import logging
+import os
 from pathlib import Path
 
 import httpx
@@ -62,6 +63,17 @@ class GithubBackend:
             return False, None  # версия файла устарела: кто-то записал раньше нас
         response.raise_for_status()
         return False, None
+
+
+def create_store(path):
+    """Хранилище-файл в ветке schedule (если есть GITHUB_TOKEN) или локальный файл для разработки."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        backend = GithubBackend(token, os.environ.get("GITHUB_REPO", "mrsetefed/kaban_eblan_bot"), path=path)
+    else:
+        logging.warning(f"GITHUB_TOKEN не задан: {path} хранится в локальном файле и пропадёт при перезапуске")
+        backend = FileBackend(path)
+    return PollStore(backend)
 
 
 class PollStore:

@@ -130,10 +130,14 @@ HIGH_SHIFT = 25         # средний сдвиг «вверх»
 LOW_SHIFT = 24          # средний сдвиг «вниз»
 SHIFT_SPREAD = 7        # разброс сдвига, чтобы крайности не были одинаковыми
 WEIGHT_TILT = 400       # чем меньше, тем сильнее сдвиг перетягивает выбор вариантов (skin, hair...)
-STRONG_ROLL_FROM = 65   # порог «сильного» результата для подкрутки отдельного игрока
-# Доли результатов 65+ при обычном броске и при принудительном сдвиге вверх (подобраны симуляцией, см. тесты)
-P_GENERAL_65 = 0.363
-P_FORCED_65 = 0.955
+
+# Личная подкрутка отдельного игрока. Общая «крайность» на него не накладывается: сильный бросок (65+) идёт по
+# отдельному правилу, а все остальные броски обычные, как без подкруток вообще.
+STRONG_ROLL_FROM = 65   # порог «сильного» результата
+STRONG_SHIFT = 10       # средний сдвиг сильного броска: даёт разброс CHAD ~25%, GIGACHAD ~33%, TRUE ADAM ~42%
+STRONG_SPREAD = 8
+MAX_STRONG_TRIES = 100
+P_NATURAL_65 = 0.098    # доля результатов 65+ при обычном броске без подкруток (измерено симуляцией, см. тесты)
 
 
 def pick(rng: random.Random, options: list, shift: float = 0.0) -> tuple[str, float]:
@@ -164,11 +168,8 @@ def strong_roll_share(user_id, username):
     return max(shares) if shares else None
 
 
-def pick_shift(rng: random.Random, strong_share=None) -> float:
-    if strong_share:
-        forced = clamp((strong_share - P_GENERAL_65) / (P_FORCED_65 - P_GENERAL_65), 0.0, 1.0)
-        if rng.random() < forced:
-            return max(0.0, rng.gauss(HIGH_SHIFT, SHIFT_SPREAD))
+def pick_shift(rng: random.Random) -> float:
+    """Общая подкрутка для всех: чаще крайности (примерно 70+ или 40-)."""
     if rng.random() < EXTREME_CHANCE:
         if rng.random() < 0.5:
             return rng.gauss(HIGH_SHIFT, SHIFT_SPREAD)
@@ -220,6 +221,25 @@ def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
     ]
     average = round(sum(m["score"] for m in metrics) / len(metrics), 1)
     return {"metrics": metrics, "average": average, "tier": score_tier(average, FINAL_TIER_SCALE)}
+
+
+def roll_strong(rng: random.Random) -> dict:
+    """Принудительно сильный бросок: результат всегда 65+, а блоки и тиры при этом остаются согласованными."""
+    stats = None
+    for _ in range(MAX_STRONG_TRIES):
+        stats = roll_stats(rng, max(0.0, rng.gauss(STRONG_SHIFT, STRONG_SPREAD)))
+        if stats["average"] >= STRONG_ROLL_FROM:
+            break
+    return stats
+
+
+def roll_for(rng: random.Random, strong_share=None) -> dict:
+    """Бросок для игрока. Без личной подкрутки действует общая. С личной подкруткой доля strong_share всех
+    бросков получается 65+ (по принудительному правилу), остальные обычные, без общей подкрутки."""
+    if strong_share:
+        forced = clamp((strong_share - P_NATURAL_65) / (1 - P_NATURAL_65), 0.0, 1.0)
+        return roll_strong(rng) if rng.random() < forced else roll_stats(rng)
+    return roll_stats(rng, pick_shift(rng))
 
 
 def format_player(name: str, stats: dict) -> str:
@@ -328,7 +348,7 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target:
         # ни реплая, ни тега: просто замеряем автора, без сравнения и без тегов
         rng = random.Random()
-        author_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(author.id, author.username)))
+        author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
         text = build_solo_text(html.escape(author.full_name), author_stats, rng)
         context.application.create_task(type_out(update, text), update=update)
         return
@@ -346,8 +366,8 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     rng = random.Random()
-    author_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(author.id, author.username)))
-    target_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(target_id, target_username)))
+    author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
+    target_stats = roll_for(rng, strong_roll_share(target_id, target_username))
     text = build_battle_text(mention_html(author), author_stats, target_name, target_stats)
 
     # Печать идёт в фоне, чтобы вебхук ответил Telegram сразу и не получил повторную доставку апдейта.

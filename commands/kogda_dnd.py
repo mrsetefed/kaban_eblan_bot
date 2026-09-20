@@ -8,6 +8,11 @@ ALLOWED_ROLE = "GM"
 # Роли игроков в USER_ROLES: по ним бот находит telegram id, чтобы следить за голосованием и тегать
 PLAYERS = ["kaban", "nekit", "ilya", "amir", "ksusha"]
 MSK = timezone(timedelta(hours=3))
+NEXT_MONTH_TEXT = "Месяц заканчивается, вот на следующий. Давайте сразу решим"
+MONTHS_NOMINATIVE = [
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+]
 
 # Опорные даты для циклических правил. Это реальные календарные даты,
 # от них считается разница в днях — работает в любом месяце и году.
@@ -41,11 +46,37 @@ def is_everyone_free(d: date) -> bool:
     )
 
 
+def month_bounds(day: date) -> tuple[date, date]:
+    """Первый и последний день месяца, в котором лежит day."""
+    first = day.replace(day=1)
+    next_first = date(day.year + 1, 1, 1) if day.month == 12 else date(day.year, day.month + 1, 1)
+    return first, next_first - timedelta(days=1)
+
+
+def is_last_week_of_month(today: date) -> bool:
+    """Последние 7 дней месяца (а не календарная неделя): сегодня и ещё не более 6 дней впереди."""
+    return (month_bounds(today)[1] - today).days < 7
+
+
+def free_dates_between(first: date, last: date) -> list[date]:
+    """Дни от first до last включительно, когда свободны все игроки."""
+    return [d for d in (first + timedelta(days=i) for i in range((last - first).days + 1)) if is_everyone_free(d)]
+
+
 def free_dates_until_month_end(today: date) -> list[date]:
-    next_month_first = date(today.year + 1, 1, 1) if today.month == 12 else date(today.year, today.month + 1, 1)
-    last_day = next_month_first - timedelta(days=1)
-    days = (last_day - today).days + 1
-    return [d for d in (today + timedelta(days=i) for i in range(days)) if is_everyone_free(d)]
+    return free_dates_between(today, month_bounds(today)[1])
+
+
+async def send_month_polls(
+    update: Update, dates: list[date], no_dates_text: str, month_note: str = None, track: bool = True
+):
+    """Опросы по свободным датам или сообщение, что дат нет. track=False: без проверки и напоминаний."""
+    if not dates:
+        await update.message.reply_text(no_dates_text)
+        return
+    options = [str(d.day) for d in dates]
+    option_dates = {str(d.day): d.isoformat() for d in dates}
+    await send_date_polls(update, options, PLAYERS, "kogda_dnd", option_dates, month_note, track)
 
 
 async def kogda_dnd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,11 +85,24 @@ async def kogda_dnd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Ошибка: ты недостаточно крут. Проверь свою крутость /krutometr")
         return
 
-    available_days = free_dates_until_month_end(datetime.now(MSK).date())
-    if not available_days:
-        await update.message.reply_text("В этом месяце совпадающих свободных дат больше нет.")
+    today = datetime.now(MSK).date()
+    this_month_dates = free_dates_until_month_end(today)
+
+    if not is_last_week_of_month(today):
+        await send_month_polls(update, this_month_dates, "В этом месяце совпадающих свободных дат больше нет.")
         return
 
-    options = [str(d.day) for d in available_days]
+    # Месяц скоро кончится: сначала итог по нему, потом сразу следующий месяц, чтобы не ждать 1-го числа.
+    # Проверка голосования и напоминания идут только для следующего месяца: до конца этого остаются считанные дни.
+    # В вопросе указан месяц, потому что в вариантах только числа.
+    await send_month_polls(
+        update, this_month_dates, "В этом месяце совпадающих свободных дат больше нет.",
+        MONTHS_NOMINATIVE[today.month - 1], track=False,
+    )
+    await update.message.reply_text(NEXT_MONTH_TEXT)
 
-    await send_date_polls(update, options, PLAYERS, "kogda_dnd")
+    next_first = month_bounds(today)[1] + timedelta(days=1)
+    next_dates = free_dates_between(next_first, month_bounds(next_first)[1])
+    await send_month_polls(
+        update, next_dates, "В следующем месяце совпадающих свободных дат нет.", MONTHS_NOMINATIVE[next_first.month - 1]
+    )

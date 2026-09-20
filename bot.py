@@ -7,7 +7,8 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from commands.get_handlers import get_handlers
-from commands.poll_tracker import handle_tick, process_due
+from commands.jobs import process_all
+from commands.poll_tracker import handle_tick
 from utils import fetch_schedule_json
 
 # --- Логирование ---
@@ -45,7 +46,7 @@ DUE_CHECK_INTERVAL = 60  # секунд между проверками, пок�
 async def tick(request):
     # внешний будильник (cron-job.org, GitHub Actions) будит бота и заодно запускает проверку
     await app.initialize()
-    return await handle_tick(request, app.bot)
+    return await handle_tick(request, app.bot, process_all)
 
 
 async def health(request):
@@ -56,7 +57,7 @@ async def due_check_loop():
     while True:
         try:
             await app.initialize()
-            await process_due(app.bot)
+            await process_all(app.bot)
         except Exception:
             logging.exception("Ошибка фоновой проверки голосований")
         await asyncio.sleep(DUE_CHECK_INTERVAL)
