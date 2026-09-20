@@ -304,3 +304,8 @@ async def krutometr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         body = html.escape(result["phrase"])
     await send_result(update, format_target_result(name, result["score"], body), result["media"])
+    try:
+        # результат цели тот же, что она получила бы сама, поэтому засчитываем его в топ недели за неё
+        await record_roll(update, result["score"], today, user=target)
+    except Exception:
+        logging.exception("Не удалось записать результат крутометра")

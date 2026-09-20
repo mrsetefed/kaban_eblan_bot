@@ -49,12 +49,13 @@ def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-async def record_roll(update: Update, score: int, day: str):
-    """Запоминает, что человек сегодня крутил крутометр в этом чате (только группы). Нужен для топа недели."""
+async def record_roll(update: Update, score: int, day: str, user=None):
+    """Запоминает результат крутометра за день для топа недели (только группы).
+    user: чей результат. По умолчанию автор команды, а при замере ответом на чужое сообщение это его цель."""
     chat = update.effective_chat
     if chat.type not in (Chat.GROUP, Chat.SUPERGROUP):
         return
-    user = update.effective_user
+    user = user or update.effective_user
     chat_key, user_key = str(chat.id), str(user.id)
 
     store = get_store()
