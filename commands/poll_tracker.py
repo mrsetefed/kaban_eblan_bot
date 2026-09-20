@@ -7,16 +7,16 @@ from types import SimpleNamespace
 
 import asyncio
 from aiohttp import web
-from telegram import Update
+from telegram import Chat, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from poll_store import FileBackend, GithubBackend, PollStore, STATE_PATH
 from utils import get_roles, mention_html
 
-# Первая проверка через случайное время после запуска опроса, вторая через сутки после первой
+# Первая проверка через случайное время после запуска опроса, вторая тоже через случайное время после первой
 FIRST_CHECK_HOURS = (10, 16)
-SECOND_CHECK_HOURS = 24
+SECOND_CHECK_HOURS = (10, 16)
 KEEP_FINISHED_DAYS = 14
 MAX_SEND_FAILURES = 5  # столько раз пробуем отправить итог, потом сдаёмся (например, бота выгнали из чата)
 RETRY_AFTER_FAILURE = timedelta(minutes=10)
@@ -37,7 +37,7 @@ UNANIMOUS_TEMPLATES = [
     "Единогласно! Играем: {dates}",
 ]
 NO_COMMON_ALL_VOTED = "Проголосовали все, но варианта, который подошёл бы каждому, нет. {setefed}, разруливай"
-NO_COMMON_MISSING = "Прошли сутки, а {who} так и не проголосовали. Общего варианта нет. {setefed}, разбирайся"
+NO_COMMON_MISSING = "Время вышло, а {who} так и не проголосовали. Общего варианта нет. {setefed}, разбирайся"
 
 _store = None
 _process_lock = asyncio.Lock()
@@ -130,6 +130,10 @@ async def send_date_polls(update: Update, options: list, participant_roles: list
             allows_multiple_answers=True,
         )
         polls.append({"poll_id": message.poll.id, "message_id": message.message_id, "options": poll_options})
+
+    # в личке с ботом голосуют для себя, напоминать там некому
+    if update.effective_chat.type == Chat.PRIVATE:
+        return
 
     try:
         await register_group(update.effective_chat.id, command, polls, participant_roles)
@@ -259,6 +263,8 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime):
         await store.mutate(failed)
         return
 
+    second_check_at = now + timedelta(hours=random.uniform(*SECOND_CHECK_HOURS))
+
     def advance(current):
         g = current["groups"][gid]
         g["failures"] = 0
@@ -266,7 +272,7 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime):
             g["done"], g["finished_at"] = True, now.isoformat()
         else:
             g["stage"] = 1
-            g["next_check_at"] = (now + timedelta(hours=SECOND_CHECK_HOURS)).isoformat()
+            g["next_check_at"] = second_check_at.isoformat()
 
     await store.mutate(advance)
 

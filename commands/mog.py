@@ -1,12 +1,15 @@
 import asyncio
 import html
+import json
 import logging
+import math
+import os
 import random
 from telegram import Update, MessageEntity
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 from telegram.ext import ContextTypes
-from utils import mention_html
+from utils import get_user_role, mention_html
 
 # Эффект печати: сколько строк добавляется за шаг и пауза между правками.
 # Telegram режет частые правки (в группах ~20 сообщений в минуту), так что быстрее нельзя.
@@ -17,7 +20,7 @@ CURSOR = " ▌"
 # (нижняя граница балла 0-100, тир) — от лучшего к худшему.
 # Одна шкала для каждого пункта и для итогового среднего.
 TIER_SCALE = [
-    (90, "TERACHAD"),
+    (90, "TRUE ADAM"),
     (80, "GIGACHAD"),
     (68, "CHAD"),
     (57, "CHADLITE"),
@@ -28,9 +31,9 @@ TIER_SCALE = [
 ]
 
 # Среднее из семи блоков «сжимается» к середине, поэтому у итога своя, более узкая шкала.
-# Подобрана по распределению: SUB-3 ~8.5%, LTN ~18%, MTN ~28%, HTN ~23%, CHADLITE ~13%, CHAD ~6.5%, GIGACHAD ~2.5%, TERACHAD ~0.5%
+# Подобрана по распределению: SUB-3 ~8.5%, LTN ~18%, MTN ~28%, HTN ~23%, CHADLITE ~13%, CHAD ~6.5%, GIGACHAD ~2.5%, TRUE ADAM ~0.5%
 FINAL_TIER_SCALE = [
-    (74, "TERACHAD"),
+    (74, "TRUE ADAM"),
     (69, "GIGACHAD"),
     (65, "CHAD"),
     (61, "CHADLITE"),
@@ -71,7 +74,7 @@ STYLE_TYPES = [
 ]
 # Финальная реплика, когда человек проверяет только себя (по итоговому тиру)
 SOLO_VERDICTS = {
-    "TERACHAD": [
+    "TRUE ADAM": [
         "Ты вышел за пределы шкалы. Учёные в панике",
         "Зеркала при тебе просят автограф",
     ],
@@ -119,25 +122,76 @@ def score_tier(score: float, scale=TIER_SCALE) -> str:
     return scale[-1][1]
 
 
-def pick(rng: random.Random, options: list) -> tuple[str, float]:
-    label, base, _ = rng.choices(options, weights=[w for _, _, w in options])[0]
+# Чтобы мемные результаты выпадали чаще, у каждого броска есть «сдвиг» в баллах: в плюс, в минус или ноль.
+# Сдвиг применяется к исходным значениям (PSL, угол челюсти, веса вариантов и т.д.), а не к итоговому числу,
+# поэтому значения в блоках и их тиры остаются согласованными.
+EXTREME_CHANCE = 0.70   # шанс, что результат уйдёт в крайность (примерно 70+ или 40-), иначе всё как обычно
+HIGH_SHIFT = 25         # средний сдвиг «вверх»
+LOW_SHIFT = 24          # средний сдвиг «вниз»
+SHIFT_SPREAD = 7        # разброс сдвига, чтобы крайности не были одинаковыми
+WEIGHT_TILT = 400       # чем меньше, тем сильнее сдвиг перетягивает выбор вариантов (skin, hair...)
+STRONG_ROLL_FROM = 65   # порог «сильного» результата для подкрутки отдельного игрока
+# Доли результатов 65+ при обычном броске и при принудительном сдвиге вверх (подобраны симуляцией, см. тесты)
+P_GENERAL_65 = 0.363
+P_FORCED_65 = 0.955
+
+
+def pick(rng: random.Random, options: list, shift: float = 0.0) -> tuple[str, float]:
+    weights = [w * math.exp(shift * (score - 50) / WEIGHT_TILT) for _, score, w in options]
+    label, base, _ = rng.choices(options, weights=weights)[0]
     return label, clamp(base + rng.uniform(-SCORE_JITTER, SCORE_JITTER), 0, 100)
 
 
-def roll_stats(rng: random.Random) -> dict:
-    psl = round(clamp(rng.gauss(4.3, 1.3), 1.0, 8.0), 1)
-    fwhr = round(clamp(rng.gauss(1.85, 0.15), 1.5, 2.3), 2)
+def strong_roll_share(user_id, username):
+    """Какую долю сильных результатов (65+) нужно игроку. Задаётся переменной окружения MOG_TUNING
+    вида {"имя роли или ник": доля}, например {"someone": 0.5}. Без переменной подкрутки нет."""
+    raw = os.environ.get("MOG_TUNING")
+    if not raw:
+        return None
+    try:
+        tuning = {str(key).lower().lstrip("@"): float(value) for key, value in json.loads(raw).items()}
+    except Exception as e:
+        logging.warning(f"MOG_TUNING не разобран: {e}")
+        return None
 
-    tilt = round(clamp(rng.gauss(2.0, 3.5), -8.0, 10.0), 1)
+    names = set()
+    if username:
+        names.add(username.lower())
+    roles = get_user_role(user_id) if user_id else None
+    for role in [roles] if isinstance(roles, str) else (roles or []):
+        names.add(str(role).lower())
+    shares = [tuning[name] for name in names if name in tuning]
+    return max(shares) if shares else None
+
+
+def pick_shift(rng: random.Random, strong_share=None) -> float:
+    if strong_share:
+        forced = clamp((strong_share - P_GENERAL_65) / (P_FORCED_65 - P_GENERAL_65), 0.0, 1.0)
+        if rng.random() < forced:
+            return max(0.0, rng.gauss(HIGH_SHIFT, SHIFT_SPREAD))
+    if rng.random() < EXTREME_CHANCE:
+        if rng.random() < 0.5:
+            return rng.gauss(HIGH_SHIFT, SHIFT_SPREAD)
+        return rng.gauss(-LOW_SHIFT, SHIFT_SPREAD)
+    return 0.0
+
+
+def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
+    psl = round(clamp(rng.gauss(4.3 + shift * 0.07, 1.3), 1.0, 8.0), 1)
+    fwhr = round(clamp(rng.gauss(1.85 + shift * 0.008, 0.15), 1.5, 2.3), 2)
+
+    tilt = round(clamp(rng.gauss(2.0 + shift * 0.18, 3.5), -8.0, 10.0), 1)
     if tilt < 0:
         tilt_label = "negative canthal tilt"
     elif tilt < 3:
         tilt_label = "neutral canthal tilt"
     else:
         tilt_label = "positive canthal tilt"
-    eyes, eyes_type_score = pick(rng, EYE_TYPES)
+    eyes, eyes_type_score = pick(rng, EYE_TYPES, shift)
 
-    gonial = round(clamp(rng.gauss(122, 7), 105, 145))
+    # идеал челюсти около 115°, поэтому вверх сдвигаем к нему (не дальше), а вниз уводим от него
+    gonial_shift = min(shift, 25)
+    gonial = round(clamp(rng.gauss(122 - gonial_shift * 0.28, 7), 105, 145))
     if gonial <= 118:
         jaw_label = "sharp jawline"
     elif gonial <= 128:
@@ -145,10 +199,10 @@ def roll_stats(rng: random.Random) -> dict:
     else:
         jaw_label = "recessed jaw"
 
-    skin, skin_score = pick(rng, SKIN_TYPES)
-    hair, hair_score = pick(rng, HAIR_TYPES)
-    style, style_score = pick(rng, STYLE_TYPES)
-    aura = round(clamp(rng.gauss(0, 3000), -10000, 10000) / 100) * 100
+    skin, skin_score = pick(rng, SKIN_TYPES, shift)
+    hair, hair_score = pick(rng, HAIR_TYPES, shift)
+    style, style_score = pick(rng, STYLE_TYPES, shift)
+    aura = round(clamp(rng.gauss(shift * 200, 3000), -10000, 10000) / 100) * 100
 
     # (название блока, значение для показа, балл 0-100)
     raw_metrics = [
@@ -274,7 +328,8 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target:
         # ни реплая, ни тега: просто замеряем автора, без сравнения и без тегов
         rng = random.Random()
-        text = build_solo_text(html.escape(author.full_name), roll_stats(rng), rng)
+        author_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(author.id, author.username)))
+        text = build_solo_text(html.escape(author.full_name), author_stats, rng)
         context.application.create_task(type_out(update, text), update=update)
         return
 
@@ -284,14 +339,16 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     if is_self:
         await update.message.reply_text(
-            f"{mention_html(author)}, самого себя замогать не получится. Даже Terachad не может замогать своё отражение. "
+            f"{mention_html(author)}, самого себя замогать не получится. Даже TRUE ADAM не может замогать своё отражение. "
             "Хочешь просто проверить себя, напиши /mog без реплая и тега.",
             parse_mode=ParseMode.HTML,
         )
         return
 
     rng = random.Random()
-    text = build_battle_text(mention_html(author), roll_stats(rng), target_name, roll_stats(rng))
+    author_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(author.id, author.username)))
+    target_stats = roll_stats(rng, pick_shift(rng, strong_roll_share(target_id, target_username)))
+    text = build_battle_text(mention_html(author), author_stats, target_name, target_stats)
 
     # Печать идёт в фоне, чтобы вебхук ответил Telegram сразу и не получил повторную доставку апдейта.
     context.application.create_task(type_out(update, text), update=update)
