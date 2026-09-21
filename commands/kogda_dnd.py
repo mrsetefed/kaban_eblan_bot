@@ -64,7 +64,8 @@ def free_dates_between(first: date, last: date) -> list[date]:
 
 
 def free_dates_until_month_end(today: date) -> list[date]:
-    return free_dates_between(today, month_bounds(today)[1])
+    """Свободные дни до конца месяца, начиная с завтрашнего: сегодняшнюю дату в опрос не включаем."""
+    return free_dates_between(today + timedelta(days=1), month_bounds(today)[1])
 
 
 async def send_month_polls(
