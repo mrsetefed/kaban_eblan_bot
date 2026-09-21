@@ -6,7 +6,7 @@ from .poll_tracker import send_date_polls
 
 ALLOWED_ROLE = "GM"
 # Роли игроков в USER_ROLES: по ним бот находит telegram id, чтобы следить за голосованием и тегать
-PLAYERS = ["kaban", "nekit", "ilya", "amir", "ksusha"]
+PLAYERS = ["kaban", "nekit", "kapo", "amir", "ksusha"]
 MSK = timezone(timedelta(hours=3))
 NEXT_MONTH_TEXT = "Месяц заканчивается, вот на следующий. Давайте сразу решим"
 MONTHS_NOMINATIVE = [

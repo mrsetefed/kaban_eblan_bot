@@ -1,3 +1,4 @@
+import copy
 import hmac
 import logging
 import os
@@ -112,6 +113,44 @@ def prune(data: dict, now: datetime):
         del events[eid]
 
 
+def group_roles(group: dict) -> list:
+    """Роли, которых ждём в голосовании. У голосований, созданных до появления поля roles, берём их из самой игры."""
+    if group.get("roles"):
+        return group["roles"]
+    if group["command"] == "kogda_dnd":
+        from .kogda_dnd import PLAYERS  # состав ДнД мог поменяться после создания голосования
+        return list(PLAYERS)
+    return list(group["participants"].values()) + list(group.get("unresolved", []))
+
+
+def sync_participants(group: dict) -> bool:
+    """Заново ищет id ролей в USER_ROLES, чтобы добавленные позже игроки попали в идущее голосование.
+    Возвращает True, если состав изменился."""
+    roles = group_roles(group)
+    found, unresolved = resolve_participants(roles)
+    if not found:  # USER_ROLES пуст или сломан: лучше оставить старый состав, чем считать, что ждать некого
+        return False
+    changed = found != group["participants"] or unresolved != group.get("unresolved", []) or group.get("roles") != roles
+    if changed:
+        group["participants"], group["unresolved"], group["roles"] = found, unresolved, roles
+    return changed
+
+
+async def sync_active_groups(store: PollStore):
+    data = await store.read()
+    stale = [gid for gid, g in data.get("groups", {}).items() if not g.get("done") and sync_participants(copy.deepcopy(g))]
+    if not stale:
+        return
+
+    def apply(current):
+        for gid in stale:
+            group = current.get("groups", {}).get(gid)
+            if group and not group.get("done"):
+                sync_participants(group)
+
+    await store.mutate(apply)
+
+
 async def register_group(chat_id: int, command: str, polls: list, participant_roles: list, note: str = None):
     participants, unresolved = resolve_participants(participant_roles)
     if unresolved:
@@ -130,6 +169,7 @@ async def register_group(chat_id: int, command: str, polls: list, participant_ro
         "stage": 0,
         "done": False,
         "failures": 0,
+        "roles": list(participant_roles),
         "participants": participants,
         "unresolved": unresolved,
         "polls": polls,
@@ -231,13 +271,15 @@ async def on_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     store = get_store()
     data = await store.read()
     gid = find_group_id(data, answer.poll_id)
-    if not gid or str(user.id) not in data["groups"][gid]["participants"]:
+    if not gid:
         return
 
     def apply(current):
         group = current.get("groups", {}).get(gid)
         if not group or group.get("done"):
             return
+        # голоса пишем от всех, а не только от известных участников: если роль игрока добавят позже, его голос уже будет учтён
+        sync_participants(group)
         poll_answers = group["answers"].setdefault(answer.poll_id, {})
         if answer.option_ids:
             poll_answers[str(user.id)] = list(answer.option_ids)
@@ -449,6 +491,10 @@ async def process_due(bot, now: datetime = None) -> int:
     now = now or utcnow()
     async with _process_lock:
         store = get_store()
+        try:
+            await sync_active_groups(store)
+        except Exception:
+            logging.exception("Не удалось обновить состав участников голосований")
         data = await store.read()
         acted = 0
         for gid, group in list(data.get("groups", {}).items()):
