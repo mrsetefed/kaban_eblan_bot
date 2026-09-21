@@ -1,4 +1,5 @@
 import logging
+import time
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -11,6 +12,8 @@ STATE_PATH = "state/users.json"
 
 _store = None
 _ids = {}  # ник в нижнем регистре -> telegram id
+RELOAD_PAUSE = 60  # не чаще раза в минуту перечитываем файл из GitHub в поисках вручную добавленных ников
+_last_reload = float("-inf")
 
 
 def get_store() -> PollStore:
@@ -25,8 +28,24 @@ def lookup(username):
     return _ids.get((username or "").lstrip("@").lower()) or None
 
 
-async def refresh_cache():
+async def lookup_fresh(username):
+    """Как lookup, но если ника нет, один раз перечитывает файл из GitHub: так работает запись, добавленная вручную."""
+    global _last_reload
+    found = lookup(username)
+    if found or not username or time.monotonic() - _last_reload < RELOAD_PAUSE:
+        return found
+    _last_reload = time.monotonic()
+    try:
+        await refresh_cache(reload=True)
+    except Exception:
+        logging.exception("Не удалось перечитать известных пользователей")
+    return lookup(username)
+
+
+async def refresh_cache(reload: bool = False):
     """Подтягивает известных пользователей из своего файла и из голосований (там тоже сохраняются ники)."""
+    if reload:
+        await get_store().refresh()  # без этого store отдаёт память, а не файл
     _ids.clear()
     for uid, info in (await get_store().read()).get("users", {}).items():
         if info.get("username"):
