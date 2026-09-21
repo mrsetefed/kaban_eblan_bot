@@ -2,21 +2,18 @@ import logging
 import re
 import time
 
-from telegram import Chat, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
-from telegram.constants import ChatMemberStatus
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
 from telegram.ext import ContextTypes
 from telegram.ext.filters import MessageFilter
 
-from utils import get_user_role
+from utils import is_allowed
 from . import media_store
 from .krutometr import MEDIA_RANGES
 from .media_store import media_kind
 
-# Наполнять медиа могут админы чата, где вызвана команда, и владелец бота (роль setefed, даже если он не админ в этом чате)
-ADMIN_STATUSES = {ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR}
-OWNER_ROLE = "setefed"
-DENIED_TEXT = "Наполнять медиа могут только админы чата."
-PRIVATE_TEXT = "В личке админов не бывает. Открой /media в чате, где ты админ."
+# Наполнять медиа могут только пользователи с ролью admin в USER_ROLES (в любом чате и в личке с ботом)
+ALLOWED_ROLES = ["admin"]
+DENIED_TEXT = "Наполнять медиа могут только админы."
 PENDING_MINUTES = 15  # сколько бот ждёт медиа после выбора блока
 
 # блок -> подпись. У крутометра дальше выбирается диапазон.
@@ -32,23 +29,8 @@ NOT_DIRECT_LINK = "Нужна прямая ссылка на файл: она з
 _pending = {}  # (чат, пользователь) -> {"key", "title", "until"}
 
 
-async def can_add(bot, chat: Chat, user_id: int) -> bool:
-    roles = get_user_role(str(user_id))
-    roles = [roles] if isinstance(roles, str) else (roles or [])
-    if OWNER_ROLE in roles:
-        return True
-    if chat.type == Chat.PRIVATE:
-        return False
-    try:
-        member = await bot.get_chat_member(chat.id, user_id)
-    except Exception as e:
-        logging.warning(f"Не удалось проверить права в чате {chat.id}: {e}")
-        return False
-    return member.status in ADMIN_STATUSES
-
-
-def denied_text(chat: Chat) -> str:
-    return PRIVATE_TEXT if chat.type == Chat.PRIVATE else DENIED_TEXT
+def can_add(user_id: int) -> bool:
+    return is_allowed(str(user_id), ALLOWED_ROLES)
 
 
 def category_markup(uid: int) -> InlineKeyboardMarkup:
@@ -92,8 +74,8 @@ PENDING_INPUT = PendingMedia()
 async def media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Открывает меню: в какой блок добавить медиа. Дальше бот принимает фото, гифки, видео и прямые ссылки."""
     user = update.effective_user
-    if not await can_add(context.bot, update.effective_chat, user.id):
-        await update.message.reply_text(denied_text(update.effective_chat))
+    if not can_add(user.id):
+        await update.message.reply_text(DENIED_TEXT)
         return
     _pending.pop((update.effective_chat.id, user.id), None)
     await update.message.reply_text("К какому блоку добавить медиа?", reply_markup=category_markup(user.id))
@@ -109,8 +91,8 @@ async def media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.from_user.id != int(uid):
         await query.answer("Это меню открыл другой человек", show_alert=True)
         return
-    if not await can_add(context.bot, query.message.chat, query.from_user.id):
-        await query.answer(denied_text(query.message.chat), show_alert=True)
+    if not can_add(query.from_user.id):
+        await query.answer(DENIED_TEXT, show_alert=True)
         return
     await query.answer()
     chat_id = query.message.chat_id
