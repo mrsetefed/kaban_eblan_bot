@@ -1,5 +1,5 @@
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler
-from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro
+from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
@@ -23,6 +23,8 @@ def get_handlers():
         CommandHandler("quote", quote.quote),
         CommandHandler("unquote", quote.unquote),
         CommandHandler("skoro", skoro.skoro),
+        CommandHandler("otmena", otmena.otmena),
+        CommandHandler("otmena_opros", otmena.otmena_opros),
         CommandHandler("top", krutometr_stats.top),
         CommandHandler("taro", taro.taro),
         PollAnswerHandler(poll_tracker.on_poll_answer),

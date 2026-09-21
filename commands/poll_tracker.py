@@ -19,8 +19,12 @@ MSK = timezone(timedelta(hours=3))
 REMINDER_HOUR = 17  # во сколько по Москве напоминать за день до игры
 
 # Первая проверка через случайное время после запуска опроса, вторая тоже через случайное время после первой
-FIRST_CHECK_HOURS = (10, 16)
-SECOND_CHECK_HOURS = (10, 16)
+FIRST_CHECK_HOURS = (8, 10)
+SECOND_CHECK_HOURS = (8, 10)
+# Не голосовавшим напоминаем в сроки выше, а «проголосовали ли уже все» проверяем каждые 3 часа с момента запуска опроса,
+# и как только все на месте, сразу пишем итог, не дожидаясь очередного срока. Так до самого финала.
+PROBE_INTERVAL = timedelta(hours=3)
+GAME_TITLES = {"kogda_dnd": "ДнД", "kogda_kamputer": "Кампутер", "kogda_wd": "ВД", "kogda_strad": "Страд"}
 KEEP_FINISHED_DAYS = 14
 MAX_SEND_FAILURES = 5  # столько раз пробуем отправить итог, потом сдаёмся (например, бота выгнали из чата)
 RETRY_AFTER_FAILURE = timedelta(minutes=10)
@@ -56,6 +60,7 @@ WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
 _store = None
 _process_lock = asyncio.Lock()
+_last_probe = {}  # id голосования -> номер уже сделанной отметки. После перезапуска проверит ещё раз, это безопасно
 
 
 def utcnow() -> datetime:
@@ -179,10 +184,35 @@ async def send_date_polls(
         return
 
     try:
+        await pin_polls(update.get_bot(), update.effective_chat.id, polls)
+    except Exception:
+        logging.exception("Не удалось закрепить опросы")
+    try:
         await register_group(update.effective_chat.id, command, polls, participant_roles, note)
     except Exception:
         # опросы уже в чате, поэтому сбой хранилища не должен ломать команду
         logging.exception("Не удалось поставить голосование на проверку")
+
+
+async def pin_polls(bot, chat_id: int, polls: list):
+    """Закрепляет опросы без уведомления. Нужны права на закрепление; если их нет, просто не закрепляем."""
+    for poll in polls:
+        try:
+            await bot.pin_chat_message(chat_id=chat_id, message_id=poll["message_id"], disable_notification=True)
+            poll["pinned"] = True
+        except Exception as e:
+            logging.warning(f"Не удалось закрепить опрос в чате {chat_id}: {e}")
+
+
+async def unpin_polls(bot, group: dict):
+    """Снимает закрепление с опросов, которые закрепил сам бот."""
+    for poll in group["polls"]:
+        if not poll.get("pinned"):
+            continue
+        try:
+            await bot.unpin_chat_message(chat_id=group["chat_id"], message_id=poll["message_id"])
+        except Exception as e:
+            logging.warning(f"Не удалось открепить опрос в чате {group['chat_id']}: {e}")
 
 
 def find_group_id(data: dict, poll_id: str):
@@ -251,8 +281,10 @@ def make_events(group: dict, dates: list, now: datetime) -> dict:
         remind_at = datetime.combine(
             date.fromisoformat(iso) - timedelta(days=1), time(REMINDER_HOUR), tzinfo=MSK
         ).astimezone(timezone.utc)
-        events[f"{group['chat_id']}:{iso}"] = {
-            "chat_id": group["chat_id"],
+        # игра одна на все чаты: событие привязано к команде (игре) и дате, а не к чату
+        events[f"{group['command']}:{iso}"] = {
+            "command": group["command"],
+            "chat_id": group["chat_id"],  # куда слать напоминание
             "date": iso,
             "remind_at": remind_at.isoformat(),
             "reminded": remind_at <= now,  # время уже прошло (решили поздно): не напоминаем, но игру помним
@@ -287,20 +319,33 @@ def unresolved_note(group: dict) -> str:
     return f"\n\n⚠️ Не смог отследить: {', '.join(group['unresolved'])} (их нет в USER_ROLES), их голоса не учтены."
 
 
-async def send_to_group(bot, group: dict, text: str):
+def reply_target(group: dict, missing: list) -> int:
+    """На какой опрос отвечать: на первый, где ещё не хватает голосов, чтобы не искать его. Если не хватает нигде, на первый."""
+    for poll in group["polls"]:
+        answers = group["answers"].get(poll["poll_id"], {})
+        if any(not answers.get(uid) for uid in missing):
+            return poll["message_id"]
+    return group["polls"][0]["message_id"]
+
+
+async def send_to_group(bot, group: dict, text: str, reply_to: int = None):
     await bot.send_message(
         chat_id=group["chat_id"],
         text=text,
         parse_mode=ParseMode.HTML,
-        reply_to_message_id=group["polls"][0]["message_id"],
+        reply_to_message_id=reply_to or group["polls"][0]["message_id"],
         allow_sending_without_reply=True,
     )
 
 
-async def check_group(bot, store: PollStore, gid: str, now: datetime):
+async def check_group(bot, store: PollStore, gid: str, now: datetime, probe_only: bool = False) -> bool:
+    """probe_only: плановой проверки нет, просто смотрим, не проголосовали ли уже все. Если не все, ничего не делаем.
+    Возвращает True, если что-то отправлено или изменено."""
     data = await store.read()
     group = data["groups"][gid]
     missing, unanimous, unanimous_dates = analyse(group)
+    if probe_only and missing:
+        return False
 
     if not missing:
         if unanimous:
@@ -319,7 +364,7 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime):
             finished = True
 
     try:
-        await send_to_group(bot, group, text + unresolved_note(group))
+        await send_to_group(bot, group, text + unresolved_note(group), reply_target(group, missing))
     except Exception:
         logging.exception(f"Не удалось отправить сообщение по голосованию {gid}")
 
@@ -331,7 +376,7 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime):
                 g["done"], g["finished_at"] = True, now.isoformat()
 
         await store.mutate(failed)
-        return
+        return True
 
     second_check_at = now + timedelta(hours=random.uniform(*SECOND_CHECK_HOURS))
     events = make_events(group, unanimous_dates, now) if finished and unanimous else {}
@@ -348,6 +393,14 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime):
             g["next_check_at"] = second_check_at.isoformat()
 
     await store.mutate(advance)
+    if finished:
+        await unpin_polls(bot, group)
+    return True
+
+
+def probe_mark(group: dict, now: datetime) -> int:
+    """Сколько полных 3-часовых периодов прошло с запуска опроса. Смена этого числа значит «пора проверить»."""
+    return int((now - datetime.fromisoformat(group["created_at"])) / PROBE_INTERVAL)
 
 
 async def send_reminder(bot, store: PollStore, event_id: str, now: datetime):
@@ -395,13 +448,18 @@ async def process_due(bot, now: datetime = None) -> int:
     async with _process_lock:
         store = get_store()
         data = await store.read()
-        due_groups = [
-            gid for gid, g in data.get("groups", {}).items()
-            if not g.get("done") and datetime.fromisoformat(g["next_check_at"]) <= now
-        ]
-        for gid in due_groups:
+        acted = 0
+        for gid, group in list(data.get("groups", {}).items()):
+            if group.get("done"):
+                continue
+            timed = datetime.fromisoformat(group["next_check_at"]) <= now
+            mark = probe_mark(group, now)
+            if not timed and not (mark >= 1 and mark > _last_probe.get(gid, 0)):
+                continue
+            _last_probe[gid] = mark
             try:
-                await check_group(bot, store, gid, now)
+                if await check_group(bot, store, gid, now, probe_only=not timed):
+                    acted += 1
             except Exception:
                 logging.exception(f"Ошибка проверки голосования {gid}")
 
@@ -416,7 +474,7 @@ async def process_due(bot, now: datetime = None) -> int:
                 await send_reminder(bot, store, eid, now)
             except Exception:
                 logging.exception(f"Ошибка напоминания {eid}")
-        return len(due_groups) + len(due_events)
+        return acted + len(due_events)
 
 
 async def handle_tick(request: web.Request, bot, runner=None) -> web.Response:
