@@ -1,9 +1,9 @@
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler
-from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena, media, six_seven
+from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena, media, six_seven, kiros
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
-    return [
+    handlers = [
         CommandHandler("help", help.help),
         CommandHandler("start", start.start),
         CommandHandler("ping", ping.ping),
@@ -40,3 +40,6 @@ def get_handlers():
         # 67 в любом написании: ответ гифкой из блока
         MessageHandler(six_seven.SIX_SEVEN_MESSAGE, six_seven.react)
     ]
+    commands = {name for handler in handlers if isinstance(handler, CommandHandler) for name in handler.commands}
+    # обработчик «)» стоит первым: команды пользователя с ролью kiros до остальных обработчиков не доходят
+    return [kiros.make_handler(commands)] + handlers

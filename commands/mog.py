@@ -179,33 +179,20 @@ def pick_shift(rng: random.Random) -> float:
     return 0.0
 
 
-def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
-    psl = round(clamp(rng.gauss(4.3 + shift * 0.07, 1.3), 1.0, 8.0), 1)
-    fwhr = round(clamp(rng.gauss(1.85 + shift * 0.008, 0.15), 1.5, 2.3), 2)
-
-    tilt = round(clamp(rng.gauss(2.0 + shift * 0.18, 3.5), -8.0, 10.0), 1)
+def build_stats(psl, fwhr, tilt, eyes, eyes_type_score, gonial, skin, skin_score, hair, hair_score, style, style_score, aura) -> dict:
+    """Собирает блоки, тиры и средний показатель из уже выбранных значений."""
     if tilt < 0:
         tilt_label = "negative canthal tilt"
     elif tilt < 3:
         tilt_label = "neutral canthal tilt"
     else:
         tilt_label = "positive canthal tilt"
-    eyes, eyes_type_score = pick(rng, EYE_TYPES, shift)
-
-    # идеал челюсти около 115°, поэтому вверх сдвигаем к нему (не дальше), а вниз уводим от него
-    gonial_shift = min(shift, 25)
-    gonial = round(clamp(rng.gauss(122 - gonial_shift * 0.28, 7), 105, 145))
     if gonial <= 118:
         jaw_label = "sharp jawline"
     elif gonial <= 128:
         jaw_label = "average jaw"
     else:
         jaw_label = "recessed jaw"
-
-    skin, skin_score = pick(rng, SKIN_TYPES, shift)
-    hair, hair_score = pick(rng, HAIR_TYPES, shift)
-    style, style_score = pick(rng, STYLE_TYPES, shift)
-    aura = round(clamp(rng.gauss(shift * 200, 3000), -10000, 10000) / 100) * 100
 
     # (название блока, значение для показа, балл 0-100)
     raw_metrics = [
@@ -223,6 +210,45 @@ def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
     ]
     average = round(sum(m["score"] for m in metrics) / len(metrics), 1)
     return {"metrics": metrics, "average": average, "tier": score_tier(average, FINAL_TIER_SCALE)}
+
+
+def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
+    psl = round(clamp(rng.gauss(4.3 + shift * 0.07, 1.3), 1.0, 8.0), 1)
+    fwhr = round(clamp(rng.gauss(1.85 + shift * 0.008, 0.15), 1.5, 2.3), 2)
+    tilt = round(clamp(rng.gauss(2.0 + shift * 0.18, 3.5), -8.0, 10.0), 1)
+    eyes, eyes_type_score = pick(rng, EYE_TYPES, shift)
+
+    # идеал челюсти около 115°, поэтому вверх сдвигаем к нему (не дальше), а вниз уводим от него
+    gonial_shift = min(shift, 25)
+    gonial = round(clamp(rng.gauss(122 - gonial_shift * 0.28, 7), 105, 145))
+
+    skin, skin_score = pick(rng, SKIN_TYPES, shift)
+    hair, hair_score = pick(rng, HAIR_TYPES, shift)
+    style, style_score = pick(rng, STYLE_TYPES, shift)
+    aura = round(clamp(rng.gauss(shift * 200, 3000), -10000, 10000) / 100) * 100
+    return build_stats(psl, fwhr, tilt, eyes, eyes_type_score, gonial, skin, skin_score, hair, hair_score, style, style_score, aura)
+
+
+# Роль в USER_ROLES, у которой в /mog всегда самый плохой результат
+WORST_ROLE = "kiros"
+
+
+def roll_worst_stats() -> dict:
+    """Худший возможный бросок: минимум в каждом блоке, без случайности."""
+    def worst(options):
+        label, score, _ = min(options, key=lambda option: option[1])
+        return label, score
+
+    eyes, eyes_score = worst(EYE_TYPES)
+    skin, skin_score = worst(SKIN_TYPES)
+    hair, hair_score = worst(HAIR_TYPES)
+    style, style_score = worst(STYLE_TYPES)
+    return build_stats(1.0, 1.5, -8.0, eyes, eyes_score, 145, skin, skin_score, hair, hair_score, style, style_score, -10000)
+
+
+def has_role(user_id, role: str) -> bool:
+    roles = get_user_role(str(user_id)) if user_id else None
+    return role in ([roles] if isinstance(roles, str) else (roles or []))
 
 
 def roll_strong(rng: random.Random) -> dict:
@@ -379,7 +405,7 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target:
         # ни реплая, ни тега: просто замеряем автора, без сравнения и без тегов
         rng = random.Random()
-        author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
+        author_stats = roll_worst_stats() if has_role(author.id, WORST_ROLE) else roll_for(rng, strong_roll_share(author.id, author.username))
         text = build_solo_text(html.escape(author.full_name), author_stats, rng)
         context.application.create_task(type_out(update, text), update=update)
         return
@@ -397,9 +423,14 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     rng = random.Random()
-    author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
+    if has_role(author.id, WORST_ROLE):
+        author_stats = roll_worst_stats()
+    else:
+        author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
     if is_bot_target(context.bot, target_id, target_username):
         target_stats = roll_bot_stats()
+    elif has_role(target_id, WORST_ROLE):
+        target_stats = roll_worst_stats()
     else:
         target_stats = roll_for(rng, strong_roll_share(target_id, target_username))
     text = build_battle_text(mention_html(author), author_stats, target_name, target_stats)
