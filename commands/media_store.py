@@ -48,15 +48,17 @@ def media_source(media: str) -> str:
     return media.split(":", 2)[2] if media.startswith(TG_PREFIX) else media
 
 
-async def send_media(message, media: str, caption: str = None, parse_mode=None):
-    """Отвечает на сообщение картинкой, гифкой или видео. Ошибку отправки не глотает: решает вызывающий."""
+async def send_media(message, media: str, caption: str = None, parse_mode=None, reply_parameters=None):
+    """Отвечает на сообщение картинкой, гифкой или видео. Ошибку отправки не глотает: решает вызывающий.
+    reply_parameters: ответ с цитатой части сообщения (ReplyParameters), иначе обычный ответ."""
     source = media_source(media)
     kind = media_kind(media)
+    extra = {"reply_parameters": reply_parameters} if reply_parameters is not None else {}
     if kind == "animation":
-        return await message.reply_animation(animation=source, caption=caption, parse_mode=parse_mode)
+        return await message.reply_animation(animation=source, caption=caption, parse_mode=parse_mode, **extra)
     if kind == "video":
-        return await message.reply_video(video=source, caption=caption, parse_mode=parse_mode)
-    return await message.reply_photo(photo=source, caption=caption, parse_mode=parse_mode)
+        return await message.reply_video(video=source, caption=caption, parse_mode=parse_mode, **extra)
+    return await message.reply_photo(photo=source, caption=caption, parse_mode=parse_mode, **extra)
 
 
 def load_links(path: Path) -> list:

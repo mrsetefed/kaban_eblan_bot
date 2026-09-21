@@ -141,14 +141,16 @@ BANDS = [
 ]
 
 
-def band_bounds(index: int) -> tuple[int, int]:
-    low = BANDS[index - 1][0] + 1 if index else 1
-    return low, BANDS[index][0]
+# Блоки медиа: до какого результата (включительно) и как называется секция в media/krutometr_links.txt.
+# Те же четыре блока предлагает команда /media, так что гифки из файла и из бота попадают в одни и те же диапазоны.
+MEDIA_RANGES = [(30, "0-30"), (60, "31-60"), (90, "61-90"), (100, "91-100")]
 
 
-def band_folder_name(index: int) -> str:
-    low, high = band_bounds(index)
-    return str(low) if low == high else f"{low}-{high}"
+def media_range(score: int) -> str:
+    for high, name in MEDIA_RANGES:
+        if score <= high:
+            return name
+    return MEDIA_RANGES[-1][1]
 
 
 def find_band(score: int) -> int:
@@ -170,7 +172,7 @@ def load_media() -> dict[str, list[str]]:
         logging.warning(f"Не удалось прочитать {MEDIA_FILE.name}: {e}")
         return {}
 
-    known = {band_folder_name(i) for i in range(len(BANDS))} | {"any"}
+    known = {name for _, name in MEDIA_RANGES} | {"any"}
     media: dict[str, list[str]] = {}
     section = "any"  # ссылки выше первой секции считаются общими
     for line_number, raw in enumerate(text.splitlines(), start=1):
@@ -209,7 +211,7 @@ def roll(user_id: int, day: str) -> dict:
     index = find_band(score)
     phrase = rng.choice(BANDS[index][1])
 
-    name = band_folder_name(index)
+    name = media_range(score)
     # ссылки из файла и то, что добавили через /media
     candidates = MEDIA.get(name, []) + media_store.stored(f"krutometr/{name}") + MEDIA.get("any", []) + media_store.stored("krutometr/any")
     media = rng.choice(candidates) if candidates and rng.random() < MEDIA_CHANCE else None

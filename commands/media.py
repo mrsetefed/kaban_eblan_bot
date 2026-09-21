@@ -2,17 +2,21 @@ import logging
 import re
 import time
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
+from telegram import Chat, InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
+from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 from telegram.ext.filters import MessageFilter
 
 from utils import get_user_role
 from . import media_store
-from .krutometr import BANDS, band_folder_name
+from .krutometr import MEDIA_RANGES
 from .media_store import media_kind
 
-ALLOWED_ROLES = {"GM", "setefed"}
-DENIED_TEXT = "Наполнять медиа может только GM."
+# Наполнять медиа могут админы чата, где вызвана команда, и владелец бота (роль setefed, даже если он не админ в этом чате)
+ADMIN_STATUSES = {ChatMemberStatus.OWNER, ChatMemberStatus.ADMINISTRATOR}
+OWNER_ROLE = "setefed"
+DENIED_TEXT = "Наполнять медиа могут только админы чата."
+PRIVATE_TEXT = "В личке админов не бывает. Открой /media в чате, где ты админ."
 PENDING_MINUTES = 15  # сколько бот ждёт медиа после выбора блока
 
 # блок -> подпись. У крутометра дальше выбирается диапазон.
@@ -28,14 +32,23 @@ NOT_DIRECT_LINK = "Нужна прямая ссылка на файл: она з
 _pending = {}  # (чат, пользователь) -> {"key", "title", "until"}
 
 
-def can_add(user_id: int) -> bool:
+async def can_add(bot, chat: Chat, user_id: int) -> bool:
     roles = get_user_role(str(user_id))
     roles = [roles] if isinstance(roles, str) else (roles or [])
-    return bool(ALLOWED_ROLES & set(roles))
+    if OWNER_ROLE in roles:
+        return True
+    if chat.type == Chat.PRIVATE:
+        return False
+    try:
+        member = await bot.get_chat_member(chat.id, user_id)
+    except Exception as e:
+        logging.warning(f"Не удалось проверить права в чате {chat.id}: {e}")
+        return False
+    return member.status in ADMIN_STATUSES
 
 
-def band_title(index: int) -> str:
-    return band_folder_name(index)
+def denied_text(chat: Chat) -> str:
+    return PRIVATE_TEXT if chat.type == Chat.PRIVATE else DENIED_TEXT
 
 
 def category_markup(uid: int) -> InlineKeyboardMarkup:
@@ -43,8 +56,8 @@ def category_markup(uid: int) -> InlineKeyboardMarkup:
 
 
 def band_markup(uid: int) -> InlineKeyboardMarkup:
-    buttons = [InlineKeyboardButton(band_title(i), callback_data=f"m|{uid}|b|{i}") for i in range(len(BANDS))]
-    rows = [buttons[i:i + 4] for i in range(0, len(buttons), 4)]
+    buttons = [InlineKeyboardButton(f"{name}%", callback_data=f"m|{uid}|b|{name}") for _, name in MEDIA_RANGES]
+    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
     rows.append([InlineKeyboardButton("Любой результат", callback_data=f"m|{uid}|b|any")])
     return InlineKeyboardMarkup(rows)
 
@@ -79,8 +92,8 @@ PENDING_INPUT = PendingMedia()
 async def media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Открывает меню: в какой блок добавить медиа. Дальше бот принимает фото, гифки, видео и прямые ссылки."""
     user = update.effective_user
-    if not can_add(user.id):
-        await update.message.reply_text(DENIED_TEXT)
+    if not await can_add(context.bot, update.effective_chat, user.id):
+        await update.message.reply_text(denied_text(update.effective_chat))
         return
     _pending.pop((update.effective_chat.id, user.id), None)
     await update.message.reply_text("К какому блоку добавить медиа?", reply_markup=category_markup(user.id))
@@ -96,8 +109,8 @@ async def media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.from_user.id != int(uid):
         await query.answer("Это меню открыл другой человек", show_alert=True)
         return
-    if not can_add(query.from_user.id):
-        await query.answer(DENIED_TEXT, show_alert=True)
+    if not await can_add(context.bot, query.message.chat, query.from_user.id):
+        await query.answer(denied_text(query.message.chat), show_alert=True)
         return
     await query.answer()
     chat_id = query.message.chat_id
@@ -113,9 +126,8 @@ async def media_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         band = rest[0]
         if band == "any":
             key, title = "krutometr/any", "Крутометр, любой результат"
-        elif band.isdigit() and int(band) < len(BANDS):
-            name = band_title(int(band))
-            key, title = f"krutometr/{name}", f"Крутометр, результат {name}"
+        elif band in {name for _, name in MEDIA_RANGES}:
+            key, title = f"krutometr/{band}", f"Крутометр, результат {band}%"
         else:
             return
     elif action == "x":

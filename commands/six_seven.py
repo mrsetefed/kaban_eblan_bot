@@ -4,7 +4,7 @@ import re
 import time
 from pathlib import Path
 
-from telegram import Message, Update
+from telegram import Message, ReplyParameters, Update
 from telegram.ext import ContextTypes
 from telegram.ext.filters import MessageFilter
 
@@ -44,16 +44,31 @@ def pool() -> list:
     return list(dict.fromkeys(STATIC_LINKS + media_store.stored(KEY)))
 
 
-async def send_reaction(message):
+def quote_parameters(message):
+    """Ответ с цитатой: в ответе Telegram подсвечивает само найденное «67», а не всё сообщение. None, если цитировать нечего
+    (например, 67 нашлось только в цитате чужого ответа)."""
+    text = getattr(message, "text", None) or getattr(message, "caption", None)
+    match = SIX_SEVEN_RE.search(text) if text else None
+    message_id = getattr(message, "message_id", None)
+    if not match or message_id is None:
+        return None
+    # позиция цитаты задаётся в единицах UTF-16, как в Telegram (эмодзи занимают две)
+    position = len(text[:match.start()].encode("utf-16-le")) // 2
+    return ReplyParameters(message_id=message_id, quote=match.group(0), quote_position=position, allow_sending_without_reply=True)
+
+
+async def send_reaction(message, reply_parameters=None):
     """Отвечает на сообщение случайной гифкой из блока 67. Если блок пуст или файл не отправился, отвечает текстом."""
     options = pool()
     if options:
         media = random.choice(options)
-        try:
-            await media_store.send_media(message, media)
-            return
-        except Exception as e:
-            logging.warning(f"Не удалось отправить гифку для 67 ({media[:60]}): {e}")
+        # если Telegram не принял цитату (например, изменили текст), повторяем обычным ответом
+        for params in ([reply_parameters, None] if reply_parameters is not None else [None]):
+            try:
+                await media_store.send_media(message, media, reply_parameters=params)
+                return
+            except Exception as e:
+                logging.warning(f"Не удалось отправить гифку для 67 ({media[:60]}, цитата: {params is not None}): {e}")
     await message.reply_text(FALLBACK_TEXT)
 
 
@@ -66,4 +81,4 @@ async def react(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if now - _last_reply.get(message.chat_id, -COOLDOWN_SECONDS) < COOLDOWN_SECONDS:
         return
     _last_reply[message.chat_id] = now
-    await send_reaction(message)
+    await send_reaction(message, quote_parameters(message))
