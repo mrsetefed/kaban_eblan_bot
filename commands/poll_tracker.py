@@ -22,9 +22,9 @@ REMINDER_HOUR = 17  # во сколько по Москве напоминать
 # Первая проверка через случайное время после запуска опроса, вторая тоже через случайное время после первой
 FIRST_CHECK_HOURS = (8, 10)
 SECOND_CHECK_HOURS = (8, 10)
-# Не голосовавшим напоминаем в сроки выше, а «проголосовали ли уже все» проверяем каждые 3 часа с момента запуска опроса,
+# Не голосовавшим напоминаем в сроки выше, а «проголосовали ли уже все» проверяем каждый час с момента запуска опроса,
 # и как только все на месте, сразу пишем итог, не дожидаясь очередного срока. Так до самого финала.
-PROBE_INTERVAL = timedelta(hours=3)
+PROBE_INTERVAL = timedelta(hours=1)
 GAME_TITLES = {"kogda_dnd": "ДнД", "kogda_kamputer": "Кампутер", "kogda_wd": "ВД", "kogda_strad": "Страд"}
 KEEP_FINISHED_DAYS = 14
 MAX_SEND_FAILURES = 5  # столько раз пробуем отправить итог, потом сдаёмся (например, бота выгнали из чата)
@@ -443,7 +443,7 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime, probe_only
 
 
 def probe_mark(group: dict, now: datetime) -> int:
-    """Сколько полных 3-часовых периодов прошло с запуска опроса. Смена этого числа значит «пора проверить»."""
+    """Сколько полных периодов PROBE_INTERVAL прошло с запуска опроса. Смена этого числа значит «пора проверить»."""
     return int((now - datetime.fromisoformat(group["created_at"])) / PROBE_INTERVAL)
 
 
@@ -496,13 +496,28 @@ async def process_due(bot, now: datetime = None) -> int:
         except Exception:
             logging.exception("Не удалось обновить состав участников голосований")
         data = await store.read()
-        acted = 0
-        for gid, group in list(data.get("groups", {}).items()):
+        due = []
+        for gid, group in data.get("groups", {}).items():
             if group.get("done"):
                 continue
             timed = datetime.fromisoformat(group["next_check_at"]) <= now
             mark = probe_mark(group, now)
-            if not timed and not (mark >= 1 and mark > _last_probe.get(gid, 0)):
+            if timed or (mark >= 1 and mark > _last_probe.get(gid, 0)):
+                due.append((gid, timed, mark))
+
+        if due:
+            # перед проверкой перечитываем состояние из GitHub, чтобы учесть правки файла вручную
+            try:
+                await store.refresh()
+                await sync_active_groups(store)
+            except Exception:
+                logging.exception("Не удалось перечитать состояние голосований, работаю с тем, что в памяти")
+            data = await store.read()
+
+        acted = 0
+        for gid, timed, mark in due:
+            group = data.get("groups", {}).get(gid)
+            if not group or group.get("done"):
                 continue
             _last_probe[gid] = mark
             try:

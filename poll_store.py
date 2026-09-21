@@ -124,6 +124,11 @@ class PollStore:
     async def _reload(self):
         self._data, self._version = await self.backend.load()
 
+    async def refresh(self):
+        """Заново читает состояние из бэкенда. Нужно, чтобы подхватить правку файла вручную: без этого бот видит только свою память."""
+        async with self._lock:
+            await self._reload()
+
     async def read(self) -> dict:
         if self._data is None:
             async with self._lock:
