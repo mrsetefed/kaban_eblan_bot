@@ -9,7 +9,8 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-from .krutometr import media_kind
+from . import media_store
+from .media_store import media_kind, send_media
 
 # Пауза между «тасую колоду» и картой, и между кадрами анимации совы
 SHUFFLE_DELAY = 1.5
@@ -223,13 +224,11 @@ async def show_card(update: Update, name: str, card: dict):
 
 async def show_owl(update: Update, name: str, card: dict):
     text = format_card(name, card)
-    if OWL_LINKS:
+    owls = OWL_LINKS + media_store.stored("taro")  # ссылки из файла и то, что добавили через /media
+    if owls:
+        link = random.choice(owls)
         try:
-            link = random.choice(OWL_LINKS)
-            if media_kind(link) == "animation":
-                await update.message.reply_animation(animation=link, caption=text, parse_mode=ParseMode.HTML)
-            else:
-                await update.message.reply_photo(photo=link, caption=text, parse_mode=ParseMode.HTML)
+            await send_media(update.message, link, caption=text, parse_mode=ParseMode.HTML)
             return
         except Exception as e:
             logging.warning(f"Не удалось отправить мемную сову {link}: {e}")

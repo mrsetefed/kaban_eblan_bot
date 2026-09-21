@@ -1,5 +1,5 @@
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler
-from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena
+from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena, media, six_seven
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
@@ -25,12 +25,18 @@ def get_handlers():
         CommandHandler("skoro", skoro.skoro),
         CommandHandler("otmena", otmena.otmena),
         CommandHandler("top", krutometr_stats.top),
+        CommandHandler("media", media.media),
         CommandHandler("taro", taro.taro),
         PollAnswerHandler(poll_tracker.on_poll_answer),
         CallbackQueryHandler(upd.upd_callback, pattern=r"^u\|"),
         CallbackQueryHandler(vlasuka.vlasuka_callback, pattern=r"^v\|"),
+        CallbackQueryHandler(media.media_callback, pattern=r"^m\|"),
+        # медиа и ссылки от того, кто наполняет блок через /media (остальных фильтр не пропускает)
+        MessageHandler(media.PENDING_INPUT, media.on_media),
         # ответ владельца календаря на запрос комментария; чужие сообщения фильтр не пропускает, они идут дальше
         MessageHandler(vlasuka.PENDING_REPLY, vlasuka.on_comment_reply),
         # 🎰 кубиком, стикером-эмодзи или просто текстом (с невидимым селектором или без)
-        MessageHandler(slot.SLOT_MESSAGE, slot.react)
+        MessageHandler(slot.SLOT_MESSAGE, slot.react),
+        # 67 в любом написании: ответ гифкой из блока
+        MessageHandler(six_seven.SIX_SEVEN_MESSAGE, six_seven.react)
     ]

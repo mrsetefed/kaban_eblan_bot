@@ -244,6 +244,33 @@ def roll_for(rng: random.Random, strong_share=None) -> dict:
     return roll_stats(rng, pick_shift(rng))
 
 
+BOT_TIER = "ЕБЛОБОТ"
+BOT_VERDICTS = [
+    "Еблобота невозможно могнуть. Шкала сломалась ещё на первом пункте",
+    "Максимум по всем параметрам. Так что это не бой, а экскурсия",
+    "Еблобот вне шкалы. Даже TRUE ADAM тут смотрит снизу вверх",
+]
+
+
+def roll_bot_stats() -> dict:
+    """Бросок для самого бота: максимум в каждом блоке, тир выше всех шкал."""
+    raw_metrics = [
+        ("Face", "PSL 8.0, FWHR 2.3"),
+        ("Eyes", "hunter eyes, +10.0° (positive canthal tilt)"),
+        ("Jawline", "115° (sharp jawline)"),
+        ("Skin", "glass skin"),
+        ("Hair", "thick hair, low hairline"),
+        ("Style", "full drip"),
+        ("Aura", "+10000 aura points"),
+    ]
+    metrics = [{"name": name, "value": value, "tier": TIER_SCALE[0][1], "score": 100.0} for name, value in raw_metrics]
+    return {"metrics": metrics, "average": 100.0, "tier": BOT_TIER, "unbeatable": True}
+
+
+def is_bot_target(bot, target_id, target_username) -> bool:
+    return target_id == bot.id or bool(target_username and target_username == (bot.username or "").lower())
+
+
 def format_player(name: str, stats: dict) -> str:
     lines = [f"<b>{name}</b>"]
     for m in stats["metrics"]:
@@ -324,7 +351,9 @@ def build_solo_text(name: str, stats: dict, rng: random.Random) -> str:
 def build_battle_text(author_name: str, author_stats: dict, target_name: str, target_stats: dict) -> str:
     margin = author_stats["average"] - target_stats["average"]
 
-    if margin == 0:
+    if target_stats.get("unbeatable"):
+        result = f"🤖 <b>{target_name}</b>: {random.choice(BOT_VERDICTS)}"
+    elif margin == 0:
         result = "🤝 Ничья. Оба одинаково ЛТН, расходимся"
     else:
         winner_name = author_name if margin > 0 else target_name
@@ -369,7 +398,10 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     rng = random.Random()
     author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
-    target_stats = roll_for(rng, strong_roll_share(target_id, target_username))
+    if is_bot_target(context.bot, target_id, target_username):
+        target_stats = roll_bot_stats()
+    else:
+        target_stats = roll_for(rng, strong_roll_share(target_id, target_username))
     text = build_battle_text(mention_html(author), author_stats, target_name, target_stats)
 
     # Печать идёт в фоне, чтобы вебхук ответил Telegram сразу и не получил повторную доставку апдейта.

@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from commands.get_handlers import get_handlers
 from commands.jobs import process_all
+from commands.media_store import refresh_cache as refresh_media
 from commands.poll_tracker import handle_tick
 from poll_store import check_storage
 from utils import fetch_schedule_json
@@ -94,8 +95,17 @@ async def report_storage():
     logging.info(await check_storage())
 
 
+async def load_media():
+    # гифки и фото, добавленные через /media, лежат в хранилище: подтягиваем их при каждом запуске
+    try:
+        await refresh_media()
+    except Exception:
+        logging.exception("Не удалось загрузить медиа из хранилища")
+
+
 async def start_background(aio_app):
     aio_app["storage_report"] = asyncio.create_task(report_storage())
+    aio_app["media_load"] = asyncio.create_task(load_media())
     aio_app["due_check_loop"] = asyncio.create_task(due_check_loop())
 
 

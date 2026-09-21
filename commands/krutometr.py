@@ -4,12 +4,13 @@ import random
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 from utils import mention_html
 from .krutometr_stats import record_roll
+from . import media_store
+from .media_store import media_kind, send_media  # media_kind импортируют и другие модули отсюда
 
 MSK = timezone(timedelta(hours=3))
 
@@ -17,8 +18,6 @@ MSK = timezone(timedelta(hours=3))
 # Telegram сам скачивает их по ссылке. Инструкция — в шапке самого файла.
 MEDIA_FILE = Path(__file__).resolve().parent.parent / "media" / "krutometr_links.txt"
 MEDIA_CHANCE = 0.5  # шанс, что ответ придёт с картинкой/гифкой, если для диапазона она есть
-ANIMATION_EXT = {".gif", ".mp4"}
-PHOTO_EXT = {".jpg", ".jpeg", ".png"}
 
 BAR_LENGTH = 10
 
@@ -159,19 +158,6 @@ def find_band(score: int) -> int:
     return len(BANDS) - 1
 
 
-def media_kind(url: str):
-    """'animation' / 'photo' по расширению ссылки или None, если ссылка не подходит."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        return None
-    suffix = Path(parsed.path).suffix.lower()
-    if suffix in ANIMATION_EXT:
-        return "animation"
-    if suffix in PHOTO_EXT:
-        return "photo"
-    return None
-
-
 def load_media() -> dict[str, list[str]]:
     """Читает media/krutometr_links.txt: секции [диапазон], под ними по одной ссылке на строку.
     Пустой или отсутствующий файл — не ошибка: тогда бот отвечает просто текстом."""
@@ -223,7 +209,9 @@ def roll(user_id: int, day: str) -> dict:
     index = find_band(score)
     phrase = rng.choice(BANDS[index][1])
 
-    candidates = MEDIA.get(band_folder_name(index), []) + MEDIA.get("any", [])
+    name = band_folder_name(index)
+    # ссылки из файла и то, что добавили через /media
+    candidates = MEDIA.get(name, []) + media_store.stored(f"krutometr/{name}") + MEDIA.get("any", []) + media_store.stored("krutometr/any")
     media = rng.choice(candidates) if candidates and rng.random() < MEDIA_CHANCE else None
     return {"score": score, "phrase": phrase, "media": media}
 
@@ -262,10 +250,7 @@ def find_target(update: Update):
 async def send_result(update: Update, text: str, media: str | None):
     if media:
         try:
-            if media_kind(media) == "animation":
-                await update.message.reply_animation(animation=media, caption=text, parse_mode=ParseMode.HTML)
-            else:
-                await update.message.reply_photo(photo=media, caption=text, parse_mode=ParseMode.HTML)
+            await send_media(update.message, media, caption=text, parse_mode=ParseMode.HTML)
             return
         except Exception as e:
             # битая ссылка или слишком тяжёлый файл не должны оставлять без ответа

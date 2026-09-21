@@ -1,9 +1,11 @@
 import html
+import logging
 import random
 import re
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from .six_seven import is_six_seven, send_reaction
 
 MAX_DICE = 100
 MAX_SIDES = 1000
@@ -65,7 +67,12 @@ async def roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     count, sides, modifier, has_modifier = parsed
     name = html.escape(update.effective_user.full_name)
-    await update.message.reply_text(
-        format_roll(name, count, sides, modifier, has_modifier, roll_dice(count, sides)),
-        parse_mode=ParseMode.HTML,
-    )
+    text = format_roll(name, count, sides, modifier, has_modifier, roll_dice(count, sides))
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+    # 67 в результате (итог 67 или подряд выпавшие 6 и 7): смотрим только строку с бросками, без имени и формулы
+    if is_six_seven(text.split("\n")[1]):
+        try:
+            await send_reaction(update.message)
+        except Exception:
+            logging.exception("Не удалось ответить на 67 в /roll")
