@@ -24,7 +24,6 @@ def get_handlers():
         CommandHandler("unquote", quote.unquote),
         CommandHandler("skoro", skoro.skoro),
         CommandHandler("otmena", otmena.otmena),
-        CommandHandler("otmena_opros", otmena.otmena_opros),
         CommandHandler("top", krutometr_stats.top),
         CommandHandler("taro", taro.taro),
         PollAnswerHandler(poll_tracker.on_poll_answer),

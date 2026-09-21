@@ -10,7 +10,7 @@ from .poll_tracker import MSK, format_date_ru, get_store, unpin_polls, utcnow
 from .skoro import describe_games, game_title, upcoming_by_game
 
 ALLOWED_ROLES = {"GM", "setefed"}
-DENIED_TEXT = "Отменять игры может только GM."
+DENIED_TEXT = "Отменять игры и голосования может только GM."
 
 # как можно назвать игру в команде
 GAME_ALIASES = {
@@ -20,8 +20,8 @@ GAME_ALIASES = {
     "strad": "kogda_strad", "страд": "kogda_strad",
 }
 USAGE = (
-    "Напиши /otmena и дату игры: /otmena 25 (ближайшее 25-е) или /otmena 25.09. "
-    "Если игр несколько, добавь название: /otmena днд 25."
+    "Отменить игру: /otmena 25 (ближайшее 25-е) или /otmena 25.09. Если игр несколько, добавь название: /otmena днд 25.\n"
+    "Отменить идущее голосование: ответь командой /otmena на сообщение с опросом."
 )
 
 DATE_RE = re.compile(r"(\d{1,2})(?:[./](\d{1,2}))?")
@@ -64,21 +64,29 @@ def find_events(data: dict, today: date, game, day: int, month):
 
 
 async def otmena(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отменяет уже решённую дату игры, чтобы по ней не было напоминания и она пропала из /skoro."""
+    """Отменяет решённую дату игры (по дате) или идущее голосование (ответом на опрос)."""
     if not can_cancel(update.effective_user.id):
         await update.message.reply_text(DENIED_TEXT)
         return
 
     store = get_store()
     today = datetime.now(MSK).date()
+    data = await store.read()
+    replied = update.message.reply_to_message
+    if replied is not None and not context.args:
+        await cancel_poll(update, context, data, replied.message_id)
+        return
+
     parsed = parse_args(context.args)
     if parsed is None:
-        data = await store.read()
-        await update.message.reply_text(f"{USAGE}\n\n{describe_games(upcoming_by_game(data, today), today)}")
+        text = f"{USAGE}\n\n{describe_games(upcoming_by_game(data, today), today)}"
+        active = active_groups(data, update.effective_chat.id)
+        if active:
+            text += "\n\nИдут голосования:\n" + "\n".join(f"• {describe_group(g)}" for _, g in active)
+        await update.message.reply_text(text)
         return
 
     game, day, month = parsed
-    data = await store.read()
     found = find_events(data, today, game, day, month)
     if not found:
         await update.message.reply_text("Такой игры в планах нет. Что есть, покажет /skoro.")
@@ -112,10 +120,6 @@ async def otmena(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logging.warning(f"Не удалось сообщить об отмене в чат {event['chat_id']}")
 
 
-POLL_DENIED_TEXT = "Отменять голосования может только GM."
-POLL_USAGE = "Ответь командой /otmena_opros на сообщение с опросом, который нужно отменить."
-
-
 def active_groups(data: dict, chat_id: int):
     return [(gid, g) for gid, g in data.get("groups", {}).items() if not g.get("done") and g["chat_id"] == chat_id]
 
@@ -133,28 +137,12 @@ def describe_group(group: dict) -> str:
     return f"{game_title(group['command'])}, создан {created:%d.%m в %H:%M} по МСК, проголосовали {voted} из {len(group['participants'])}"
 
 
-async def otmena_opros(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отменяет идущее голосование: проверки и напоминания по нему прекращаются, опрос закрывается и откреплается."""
-    if not can_cancel(update.effective_user.id):
-        await update.message.reply_text(POLL_DENIED_TEXT)
-        return
-
-    store = get_store()
+async def cancel_poll(update: Update, context: ContextTypes.DEFAULT_TYPE, data: dict, message_id: int):
+    """Проверки и напоминания по голосованию прекращаются, опрос закрывается и откреплается."""
     chat_id = update.effective_chat.id
-    data = await store.read()
-    replied = update.message.reply_to_message
-    if replied is None:
-        active = active_groups(data, chat_id)
-        if not active:
-            await update.message.reply_text("В этом чате нет голосований, которые сейчас отслеживаются.")
-            return
-        lines = "\n".join(f"• {describe_group(g)}" for _, g in active)
-        await update.message.reply_text(f"{POLL_USAGE}\n\nСейчас идут:\n{lines}")
-        return
-
-    gid, group = find_group_by_message(data, chat_id, replied.message_id)
+    gid, group = find_group_by_message(data, chat_id, message_id)
     if group is None:
-        await update.message.reply_text(f"Это не отслеживаемый опрос (или он уже завершён). {POLL_USAGE}")
+        await update.message.reply_text("Это не отслеживаемый опрос (или он уже завершён). Что можно отменить, покажет /otmena без аргументов.")
         return
 
     def cancel(current):
@@ -162,7 +150,7 @@ async def otmena_opros(update: Update, context: ContextTypes.DEFAULT_TYPE):
         g["done"], g["cancelled"], g["finished_at"] = True, True, utcnow().isoformat()
 
     try:
-        await store.mutate(cancel)
+        await get_store().mutate(cancel)
     except Exception as e:
         logging.exception("Не удалось отменить голосование")
         await update.message.reply_text(f"Не смог отменить: хранилище недоступно ({str(e)[:150]})")
