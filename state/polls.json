@@ -85,6 +85,49 @@
           ]
         }
       }
+    },
+    "5296689789825720881": {
+      "chat_id": -5264403141,
+      "command": "kogda_dnd",
+      "note": null,
+      "created_at": "2026-09-21T00:27:14.555064+00:00",
+      "next_check_at": "2026-09-21T09:52:02.258116+00:00",
+      "stage": 0,
+      "done": false,
+      "failures": 0,
+      "roles": [
+        "kaban",
+        "nekit",
+        "kapo",
+        "amir",
+        "ksusha"
+      ],
+      "participants": {
+        "463045227": "kaban",
+        "1759322833": "nekit",
+        "463088601": "kapo",
+        "522892896": "amir",
+        "5479061243": "ksusha"
+      },
+      "unresolved": [],
+      "polls": [
+        {
+          "poll_id": "5296689789825720881",
+          "message_id": 13756,
+          "options": [
+            "Ничего не подходит",
+            "21",
+            "25"
+          ],
+          "dates": [
+            null,
+            "2026-09-21",
+            "2026-09-25"
+          ],
+          "pinned": true
+        }
+      ],
+      "answers": {}
     }
   },
   "users": {
