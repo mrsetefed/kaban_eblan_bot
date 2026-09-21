@@ -55,13 +55,12 @@
       "failures": 0,
       "participants": {
         "463045227": "kaban",
-        "1759322833": "nekit"
+        "1759322833": "nekit",
+        "463088601": "kapo",
+        "522892896": "amir",
+        "5479061243": "ksusha"
       },
-      "unresolved": [
-        "ilya",
-        "amir",
-        "ksusha"
-      ],
+      "unresolved": [],
       "polls": [
         {
           "poll_id": "5298771612013698700",
@@ -84,7 +83,14 @@
             2
           ]
         }
-      }
+      },
+      "roles": [
+        "kaban",
+        "nekit",
+        "kapo",
+        "amir",
+        "ksusha"
+      ]
     },
     "5296689789825720881": {
       "chat_id": -5264403141,
