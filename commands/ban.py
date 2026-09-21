@@ -4,7 +4,7 @@ from telegram.ext.filters import MessageFilter
 
 from utils import get_user_role
 
-MUTED_ROLE = "kiros"  # роль в USER_ROLES, которой на любую команду бота приходит только это:
+MUTED_ROLE = "ban"  # роль в USER_ROLES, которой на любую команду бота приходит только это:
 ANSWER = ")"
 
 
@@ -24,7 +24,7 @@ def command_name(message: Message):
 
 
 class MutedUserCommand(MessageFilter):
-    """Команда, которую бот знает и которая адресована ему (без @другого_бота), от пользователя с ролью kiros."""
+    """Команда, которую бот знает и которая адресована ему (без @другого_бота), от пользователя с ролью ban."""
 
     def __init__(self, commands):
         super().__init__()

@@ -10,6 +10,7 @@ from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 from telegram.ext import ContextTypes
 from utils import get_user_role, mention_html
+from . import known_users
 
 # Эффект печати: сколько строк добавляется за шаг и пауза между правками.
 # Telegram режет частые правки (в группах ~20 сообщений в минуту), так что быстрее нельзя.
@@ -230,7 +231,7 @@ def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
 
 
 # Роль в USER_ROLES, у которой в /mog всегда самый плохой результат
-WORST_ROLE = "kiros"
+WORST_ROLE = "ban"
 
 
 def roll_worst_stats() -> dict:
@@ -411,6 +412,9 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     target_name, target_id, target_username = target
+    if target_id is None:
+        # обычный @тег: id в тексте нет, ищем среди тех, кого бот уже видел (по нему определяются роли)
+        target_id = known_users.lookup(target_username)
     is_self = target_id == author.id or (
         target_username and target_username == (author.username or "").lower()
     )

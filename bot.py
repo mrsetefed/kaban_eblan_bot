@@ -4,11 +4,12 @@ import logging
 import asyncio
 from aiohttp import web
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 from commands.get_handlers import get_handlers
 from commands.jobs import process_all
 from commands.media_store import refresh_cache as refresh_media
+from commands import known_users
 from commands.poll_tracker import handle_tick
 from poll_store import check_storage
 from utils import fetch_schedule_json
@@ -101,6 +102,10 @@ async def load_media():
         await refresh_media()
     except Exception:
         logging.exception("Не удалось загрузить медиа из хранилища")
+    try:
+        await known_users.refresh_cache()
+    except Exception:
+        logging.exception("Не удалось загрузить известных пользователей")
 
 
 async def start_background(aio_app):
@@ -129,6 +134,8 @@ async def main():
 
     for handler in get_handlers():
         app.add_handler(handler)
+    # отдельная группа: запоминает ники по каждому сообщению и не мешает обработчикам команд
+    app.add_handler(MessageHandler(filters.ALL, known_users.track), group=-1)
     app.add_error_handler(on_error)
 
     if WEBHOOK_URL:

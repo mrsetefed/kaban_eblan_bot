@@ -1,5 +1,5 @@
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, PollAnswerHandler
-from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena, media, six_seven, kiros
+from . import poll_tracker, krutometr_stats, roll, quote, skoro, slot, taro, otmena, media, six_seven, ban
 from . import start, ping, today, verify, krutometr, kogda_strad, kogda_wd, upd, help, vlasuka, tomorrow, week, kogda_kamputer, kogda_dnd, mog
 
 def get_handlers():
@@ -41,5 +41,5 @@ def get_handlers():
         MessageHandler(six_seven.SIX_SEVEN_MESSAGE, six_seven.react)
     ]
     commands = {name for handler in handlers if isinstance(handler, CommandHandler) for name in handler.commands}
-    # обработчик «)» стоит первым: команды пользователя с ролью kiros до остальных обработчиков не доходят
-    return [kiros.make_handler(commands)] + handlers
+    # обработчик «)» стоит первым: команды пользователя с ролью ban до остальных обработчиков не доходят
+    return [ban.make_handler(commands)] + handlers
