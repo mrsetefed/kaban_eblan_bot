@@ -351,6 +351,8 @@ async def check_group(bot, store: PollStore, gid: str, now: datetime, probe_only
         if unanimous:
             dates_text = format_list(unanimous) + (f" ({group['note']})" if group.get("note") else "")
             text = random.choice(UNANIMOUS_TEMPLATES).format(dates=dates_text)
+            everyone = [await mention_for(bot, group, data.get("users", {}), uid) for uid in group["participants"]]
+            text += "\n" + " ".join(everyone)  # тегаем всех, чтобы никто не пропустил
         else:
             text = NO_COMMON_ALL_VOTED.format(setefed=SETEFED_TAG)
         finished = True
