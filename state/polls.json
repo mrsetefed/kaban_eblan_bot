@@ -51,7 +51,7 @@
       "created_at": "2026-09-20T21:06:59.493473+00:00",
       "next_check_at": "2026-09-21T18:24:20.371475+00:00",
       "stage": 1,
-      "done": false,
+      "done": true,
       "failures": 0,
       "participants": {
         "463045227": "kaban",
@@ -104,7 +104,8 @@
         "kapo",
         "amir",
         "ksusha"
-      ]
+      ],
+      "finished_at": "2026-09-21T11:07:59.241229+00:00"
     },
     "5296689789825720881": {
       "chat_id": -5264403141,
@@ -168,6 +169,24 @@
     "522892896": {
       "name": "AmirotkZ",
       "username": "Amirotkaz"
+    }
+  },
+  "events": {
+    "kogda_dnd:2026-09-25": {
+      "command": "kogda_dnd",
+      "chat_id": -5438968535,
+      "date": "2026-09-25",
+      "remind_at": "2026-09-24T14:00:00+00:00",
+      "reminded": false,
+      "failures": 0,
+      "participants": {
+        "463045227": "kaban",
+        "1759322833": "nekit",
+        "463088601": "kapo",
+        "522892896": "amir",
+        "5479061243": "ksusha"
+      },
+      "reply_to": 13727
     }
   }
 }
