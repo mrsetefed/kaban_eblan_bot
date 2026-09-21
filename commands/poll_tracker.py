@@ -500,8 +500,13 @@ async def process_due(bot, now: datetime = None) -> int:
         for gid, group in data.get("groups", {}).items():
             if group.get("done"):
                 continue
-            timed = datetime.fromisoformat(group["next_check_at"]) <= now
-            mark = probe_mark(group, now)
+            try:
+                timed = datetime.fromisoformat(group["next_check_at"]) <= now
+                mark = probe_mark(group, now)
+            except (ValueError, KeyError, TypeError) as e:
+                # например, время в файле поправили вручную с опечаткой: одно кривое голосование не должно останавливать остальные
+                logging.error(f"Голосование {gid}: не разобрать даты ({e}), пропускаю. Формат: 2026-09-21T08:52:00+00:00")
+                continue
             if timed or (mark >= 1 and mark > _last_probe.get(gid, 0)):
                 due.append((gid, timed, mark))
 
