@@ -159,7 +159,7 @@
       "created_at": "2026-09-24T01:38:05.330316+00:00",
       "next_check_at": "2026-09-24T10:08:54.979068+00:00",
       "stage": 0,
-      "done": false,
+      "done": true,
       "failures": 0,
       "roles": [
         "kaban",
@@ -201,7 +201,9 @@
           "pinned": true
         }
       ],
-      "answers": {}
+      "answers": {},
+      "cancelled": true,
+      "finished_at": "2026-09-24T01:38:20.641193+00:00"
     }
   },
   "users": {
