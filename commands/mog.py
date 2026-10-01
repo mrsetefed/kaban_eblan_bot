@@ -10,7 +10,7 @@ from telegram.constants import ParseMode
 from telegram.error import RetryAfter
 from telegram.ext import ContextTypes
 from utils import get_user_role, mention_html
-from . import known_users
+from . import known_users, moderation
 
 # Эффект печати: сколько строк добавляется за шаг и пауза между правками.
 # Telegram режет частые правки (в группах ~20 сообщений в минуту), так что быстрее нельзя.
@@ -230,26 +230,38 @@ def roll_stats(rng: random.Random, shift: float = 0.0) -> dict:
     return build_stats(psl, fwhr, tilt, eyes, eyes_type_score, gonial, skin, skin_score, hair, hair_score, style, style_score, aura)
 
 
-# Роль в USER_ROLES, у которой в /mog всегда самый плохой результат
-WORST_ROLE = "ban"
+def extreme_option(options, best: bool):
+    """Вариант блока (eyes/skin/hair/style) с самым высоким или самым низким баллом, без случайности."""
+    label, score, _ = (max if best else min)(options, key=lambda option: option[1])
+    return label, score
 
 
 def roll_worst_stats() -> dict:
-    """Худший возможный бросок: минимум в каждом блоке, без случайности."""
-    def worst(options):
-        label, score, _ = min(options, key=lambda option: option[1])
-        return label, score
-
-    eyes, eyes_score = worst(EYE_TYPES)
-    skin, skin_score = worst(SKIN_TYPES)
-    hair, hair_score = worst(HAIR_TYPES)
-    style, style_score = worst(STYLE_TYPES)
+    """Забанен (/ban): худший возможный бросок, минимум в каждом блоке, без случайности."""
+    eyes, eyes_score = extreme_option(EYE_TYPES, best=False)
+    skin, skin_score = extreme_option(SKIN_TYPES, best=False)
+    hair, hair_score = extreme_option(HAIR_TYPES, best=False)
+    style, style_score = extreme_option(STYLE_TYPES, best=False)
     return build_stats(1.0, 1.5, -8.0, eyes, eyes_score, 145, skin, skin_score, hair, hair_score, style, style_score, -10000)
 
 
-def has_role(user_id, role: str) -> bool:
-    roles = get_user_role(str(user_id)) if user_id else None
-    return role in ([roles] if isinstance(roles, str) else (roles or []))
+def roll_vip_stats() -> dict:
+    """Вип (/vip): лучший возможный бросок, максимум в каждом блоке, без случайности.
+    В отличие от roll_bot_stats идёт в обычное сравнение (margin, победитель), без фразы про непобедимость."""
+    eyes, eyes_score = extreme_option(EYE_TYPES, best=True)
+    skin, skin_score = extreme_option(SKIN_TYPES, best=True)
+    hair, hair_score = extreme_option(HAIR_TYPES, best=True)
+    style, style_score = extreme_option(STYLE_TYPES, best=True)
+    return build_stats(8.0, 2.3, 10.0, eyes, eyes_score, 115, skin, skin_score, hair, hair_score, style, style_score, 10000)
+
+
+def roll_with_flags(rng: random.Random, user_id, username, strong_share=None) -> dict:
+    """Бросок с учётом /ban и /vip (или тех же ролей в USER_ROLES). Без них — обычный roll_for."""
+    if moderation.is_banned(user_id):
+        return roll_worst_stats()
+    if moderation.is_vip(user_id):
+        return roll_vip_stats()
+    return roll_for(rng, strong_share)
 
 
 def roll_strong(rng: random.Random) -> dict:
@@ -406,15 +418,15 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target:
         # ни реплая, ни тега: просто замеряем автора, без сравнения и без тегов
         rng = random.Random()
-        author_stats = roll_worst_stats() if has_role(author.id, WORST_ROLE) else roll_for(rng, strong_roll_share(author.id, author.username))
+        author_stats = roll_with_flags(rng, author.id, author.username, strong_roll_share(author.id, author.username))
         text = build_solo_text(html.escape(author.full_name), author_stats, rng)
         context.application.create_task(type_out(update, text), update=update)
         return
 
     target_name, target_id, target_username = target
     if target_id is None:
-        # обычный @тег: id в тексте нет, ищем среди тех, кого бот уже видел (по нему определяются роли)
-        target_id = await known_users.lookup_fresh(target_username)
+        # обычный @тег: id в тексте нет, ищем среди тех, кого бот уже видел, а если не видел — пробуем спросить у Telegram
+        target_id = await known_users.lookup_or_fetch(context.bot, target_username)
     is_self = target_id == author.id or (
         target_username and target_username == (author.username or "").lower()
     )
@@ -427,16 +439,11 @@ async def mog(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     rng = random.Random()
-    if has_role(author.id, WORST_ROLE):
-        author_stats = roll_worst_stats()
-    else:
-        author_stats = roll_for(rng, strong_roll_share(author.id, author.username))
+    author_stats = roll_with_flags(rng, author.id, author.username, strong_roll_share(author.id, author.username))
     if is_bot_target(context.bot, target_id, target_username):
         target_stats = roll_bot_stats()
-    elif has_role(target_id, WORST_ROLE):
-        target_stats = roll_worst_stats()
     else:
-        target_stats = roll_for(rng, strong_roll_share(target_id, target_username))
+        target_stats = roll_with_flags(rng, target_id, target_username, strong_roll_share(target_id, target_username))
     text = build_battle_text(mention_html(author), author_stats, target_name, target_stats)
 
     # Печать идёт в фоне, чтобы вебхук ответил Telegram сразу и не получил повторную доставку апдейта.

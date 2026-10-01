@@ -545,13 +545,31 @@ async def process_due(bot, now: datetime = None) -> int:
         return acted + len(due_events)
 
 
+_last_tick_at = None  # когда «будильник» последний раз успешно достучался — чтобы видеть в /health, не молчит ли он
+_tick_count = 0
+
+
+def tick_status() -> dict:
+    """Для /health: когда был последний удачный /tick и сколько секунд назад. Большое число или null — будильник не достучался."""
+    return {
+        "last_tick_at": _last_tick_at.isoformat() if _last_tick_at else None,
+        "tick_count": _tick_count,
+        "seconds_since_last_tick": (utcnow() - _last_tick_at).total_seconds() if _last_tick_at else None,
+    }
+
+
 async def handle_tick(request: web.Request, bot, runner=None) -> web.Response:
     """Точка входа для внешнего «будильника» (cron-job.org): будит бота и запускает все отложенные проверки."""
+    global _last_tick_at, _tick_count
     secret = os.environ.get("TICK_SECRET")
     if not secret:
+        logging.warning("/tick: TICK_SECRET не задан, эндпоинт выключен")
         return web.Response(status=503, text="tick disabled: TICK_SECRET is not set")
     given = request.headers.get("X-Tick-Key") or request.query.get("key", "")
     if not hmac.compare_digest(given.encode(), secret.encode()):
+        logging.warning("/tick: неверный или отсутствующий ключ")
         return web.Response(status=403, text="forbidden")
     processed = await (runner or process_due)(bot)
+    _last_tick_at, _tick_count = utcnow(), _tick_count + 1
+    logging.info(f"/tick #{_tick_count}: обработано {processed}")
     return web.Response(text=f"ok, processed={processed}")

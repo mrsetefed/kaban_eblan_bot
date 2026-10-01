@@ -2,15 +2,14 @@ from telegram import Message, Update
 from telegram.ext import ContextTypes, MessageHandler
 from telegram.ext.filters import MessageFilter
 
-from utils import get_user_role
+from . import moderation
 
-MUTED_ROLE = "ban"  # роль в USER_ROLES, которой на любую команду бота приходит только это:
 ANSWER = ")"
 
 
 def has_muted_role(user_id) -> bool:
-    roles = get_user_role(str(user_id)) if user_id else None
-    return MUTED_ROLE in ([roles] if isinstance(roles, str) else (roles or []))
+    """Забанен ли человек: ролью "ban" в USER_ROLES или командой /ban."""
+    return moderation.is_banned(user_id)
 
 
 def command_name(message: Message):

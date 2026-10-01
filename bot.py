@@ -9,8 +9,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, Messa
 from commands.get_handlers import get_handlers
 from commands.jobs import process_all
 from commands.media_store import refresh_cache as refresh_media
-from commands import known_users
-from commands.poll_tracker import handle_tick
+from commands import known_users, known_chats, moderation
+from commands.poll_tracker import handle_tick, tick_status
 from poll_store import check_storage
 from utils import fetch_schedule_json
 
@@ -78,7 +78,8 @@ async def tick(request):
 
 
 async def health(request):
-    return web.Response(text="ok")
+    # /health открытым текстом показывает, когда бота в последний раз будил cron-job.org — удобно проверять сон бота
+    return web.json_response({"status": "ok", **tick_status()})
 
 
 async def due_check_loop():
@@ -96,21 +97,30 @@ async def report_storage():
     logging.info(await check_storage())
 
 
-async def load_media():
-    # гифки и фото, добавленные через /media, лежат в хранилище: подтягиваем их при каждом запуске
-    try:
-        await refresh_media()
-    except Exception:
-        logging.exception("Не удалось загрузить медиа из хранилища")
-    try:
-        await known_users.refresh_cache()
-    except Exception:
-        logging.exception("Не удалось загрузить известных пользователей")
+async def load_caches():
+    # медиа из /media, ники по тегам, список чатов для /broadcast и флаги /ban, /vip — всё лежит в GitHub,
+    # подтягиваем при каждом запуске, иначе после перезапуска бот о них "забудет" до первого нового упоминания
+    for name, refresh in (
+        ("медиа", refresh_media),
+        ("известных пользователей", known_users.refresh_cache),
+        ("известных чатов", known_chats.refresh_cache),
+        ("банов и вип", moderation.refresh_cache),
+    ):
+        try:
+            await refresh()
+        except Exception:
+            logging.exception(f"Не удалось загрузить {name} из хранилища")
+
+
+async def track_activity(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запоминает автора, собеседника по реплаю и сам чат — на будущее для /mog, /ban, /vip и /broadcast."""
+    await known_users.track(update, context)
+    await known_chats.track(update, context)
 
 
 async def start_background(aio_app):
     aio_app["storage_report"] = asyncio.create_task(report_storage())
-    aio_app["media_load"] = asyncio.create_task(load_media())
+    aio_app["media_load"] = asyncio.create_task(load_caches())
     aio_app["due_check_loop"] = asyncio.create_task(due_check_loop())
 
 
@@ -134,8 +144,8 @@ async def main():
 
     for handler in get_handlers():
         app.add_handler(handler)
-    # отдельная группа: запоминает ники по каждому сообщению и не мешает обработчикам команд
-    app.add_handler(MessageHandler(filters.ALL, known_users.track), group=-1)
+    # отдельная группа: запоминает ники и чаты по каждому сообщению, не мешает обработчикам команд
+    app.add_handler(MessageHandler(filters.ALL, track_activity), group=-1)
     app.add_error_handler(on_error)
 
     if WEBHOOK_URL:

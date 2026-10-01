@@ -1,5 +1,4 @@
 import calendar
-import html
 import logging
 import time
 from datetime import date
@@ -12,6 +11,7 @@ from telegram.ext.filters import MessageFilter
 
 from utils import get_user_role, mention_html
 from . import upd as U
+from .skoro import plural_days
 from .vlas_schedule import (
     BUSY, FILE_ROLE, FREE, effective_status, entry_comment, format_day, today_utc, write_changes,
 )
@@ -64,17 +64,47 @@ def calendar_markup(owner: int, year: int, month: int, current: int, initial: in
     return U.days_markup(owner, year, month, current, initial, today, prefix=PREFIX, extra_rows=[comment_row])
 
 
+def mask_from_days(days) -> int:
+    return sum(1 << (d - 1) for d in days)
+
+
+def days_from_mask(mask: int, candidates: list) -> list:
+    return [d for d in candidates if mask & (1 << (d - 1))]
+
+
+def to_dative(n: int) -> str:
+    """'дню' для одного дня, 'дням' для нескольких (после предлога «к»)."""
+    return "дню" if n % 10 == 1 and n % 100 != 11 else "дням"
+
+
+def comment_picker_text(year: int, month: int, selected: int, total: int) -> str:
+    count = bin(selected).count("1")
+    return (
+        f"Выбери дни, к которым нужен один и тот же комментарий ({U.MONTHS_NOMINATIVE[month - 1]} {year}).\n"
+        f"💬 — комментарий уже есть, ✅ — выбран для записи.\nВыбрано: {count} из {total}."
+    )
+
+
 def comment_picker_markup(
-    owner: int, year: int, month: int, current: int, initial: int, today: date, commented: set
+    owner: int, year: int, month: int, current: int, initial: int, today: date, commented: int, selected: int
 ) -> InlineKeyboardMarkup:
     key = U.month_key(year, month)
+    hexes = f"{current:x}", f"{initial:x}"
 
     def day_button(day):
-        label = f"{day}💬" if day in commented else str(day)
-        return InlineKeyboardButton(label, callback_data=cb("d", owner, key, f"{current:x}", f"{initial:x}", day))
+        bit = 1 << (day - 1)
+        label = ("✅" if selected & bit else "") + str(day) + ("💬" if commented & bit else "")
+        return InlineKeyboardButton(label, callback_data=cb("p", owner, key, *hexes, f"{selected:x}", f"{commented:x}", day))
 
     rows = U.calendar_rows(year, month, set(U.editable_days(year, month, today)), day_button, f"{PREFIX}|n")
-    rows.append([InlineKeyboardButton("Назад", callback_data=cb("r", owner, key, f"{current:x}", f"{initial:x}"))])
+    footer = []
+    if selected:
+        footer.append(InlineKeyboardButton(
+            f"Написать комментарий ({bin(selected).count('1')})",
+            callback_data=cb("w", owner, key, *hexes, f"{selected:x}", f"{commented:x}"),
+        ))
+    footer.append(InlineKeyboardButton("Назад", callback_data=cb("r", owner, key, *hexes)))
+    rows.append(footer)
     return InlineKeyboardMarkup(rows)
 
 
@@ -136,23 +166,33 @@ class PendingReply(MessageFilter):
 PENDING_REPLY = PendingReply()
 
 
-async def start_comment(query, context, owner: int, key: str, current: int, initial: int, day: int, today: date):
+def format_days_phrase(year: int, month: int, days: list) -> str:
+    """Список дат для сообщения: все подряд, если их немного, иначе счёт и крайние даты."""
+    labels = [format_day(date(year, month, d)) for d in days]
+    if len(labels) <= 6:
+        return ", ".join(labels)
+    return f"{plural_days(len(labels))} ({labels[0]} — {labels[-1]})"
+
+
+async def start_comment(query, context, owner: int, key: str, current: int, initial: int, days: list, today: date):
     year, month = U.parse_month_key(key)
-    if day not in U.editable_days(year, month, today):
+    days = sorted(d for d in days if d in U.editable_days(year, month, today))
+    if not days:
         await query.answer(U.STALE_TEXT, show_alert=True)
         return
 
-    iso = date(year, month, day).isoformat()
+    isos = [date(year, month, d).isoformat() for d in days]
     response, schedule = await load_current()
     if schedule is None:
         await query.answer(f"Не смог загрузить график ({response.status_code}), попробуй ещё раз", show_alert=True)
         return
 
-    existing = entry_comment(schedule.get(iso))
-    lines = [f"{mention_html(query.from_user)}, напиши комментарий к дню: {format_day(date(year, month, day))} (до {COMMENT_MAX} символов)."]
-    if existing:
-        lines.append(f"Сейчас: «{html.escape(existing)}»")
-    lines.append("Чтобы убрать комментарий, отправь минус.")
+    days_phrase = format_days_phrase(year, month, days)
+    existing_count = sum(1 for iso in isos if entry_comment(schedule.get(iso)))
+    lines = [f"{mention_html(query.from_user)}, напиши комментарий к {to_dative(len(days))}: {days_phrase} (до {COMMENT_MAX} символов)."]
+    if existing_count:
+        lines.append(f"У {existing_count} из {len(days)} уже есть комментарий, он будет заменён этим.")
+    lines.append("Чтобы убрать комментарий везде, отправь минус.")
 
     chat_id = query.message.chat_id
     prompt = await context.bot.send_message(
@@ -163,7 +203,7 @@ async def start_comment(query, context, owner: int, key: str, current: int, init
     )
     prune_pending()
     PENDING[(chat_id, prompt.message_id)] = {
-        "owner": owner, "iso": iso, "calendar_message_id": query.message.message_id,
+        "owner": owner, "isos": isos, "calendar_message_id": query.message.message_id,
         "key": key, "current": current, "initial": initial, "created": _now(),
     }
     await query.answer()
@@ -172,7 +212,7 @@ async def start_comment(query, context, owner: int, key: str, current: int, init
     )]])
     await U.edit(
         query,
-        f"✍️ Жду комментарий к дню: {format_day(date(year, month, day))}. Напиши его в ответ на сообщение ниже.",
+        f"✍️ Жду комментарий к {to_dative(len(days))}: {days_phrase}. Напиши его в ответ на сообщение ниже.",
         cancel,
     )
 
@@ -182,6 +222,7 @@ async def on_comment_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = message.chat_id
     prompt_id = message.reply_to_message.message_id
     pending = PENDING[(chat_id, prompt_id)]
+    isos = pending["isos"]
 
     text = message.text.strip()
     if text in ("-", "—", "–"):
@@ -192,7 +233,7 @@ async def on_comment_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         comment = text
 
-    stage, response = await write_changes({}, {pending["iso"]: comment})
+    stage, response = await write_changes({}, {iso: comment for iso in isos})
     if stage != "ok":
         logging.error(f"vlasuka: не удалось сохранить комментарий: {stage} {response.status_code} {response.text}")
         await message.reply_text(f"Не получилось сохранить ({response.status_code}). Отправь комментарий ещё раз.")
@@ -206,8 +247,8 @@ async def on_comment_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
     year, month = U.parse_month_key(pending["key"])
-    day_text = format_day(date.fromisoformat(pending["iso"]))
-    note = f"💬 Комментарий к дню {day_text} {'сохранён' if comment else 'убран'}."
+    days_phrase = format_days_phrase(year, month, sorted(date.fromisoformat(iso).day for iso in isos))
+    note = f"💬 Комментарий к {to_dative(len(isos))}: {days_phrase} {'сохранён' if comment else 'убран'}."
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -240,6 +281,14 @@ async def on_month_chosen(query, owner: int, key: str, today: date):
     await U.edit(query, calendar_text(year, month), calendar_markup(owner, year, month, initial, initial, today))
 
 
+async def render_comment_picker(query, owner: int, year: int, month: int, current: int, initial: int, today: date, commented: int, selected: int):
+    await U.edit(
+        query,
+        comment_picker_text(year, month, selected, len(U.editable_days(year, month, today))),
+        comment_picker_markup(owner, year, month, current, initial, today, commented, selected),
+    )
+
+
 async def on_comment_picker(query, owner: int, key: str, current: int, initial: int, today: date):
     year, month = U.parse_month_key(key)
     response, schedule = await load_current()
@@ -248,12 +297,28 @@ async def on_comment_picker(query, owner: int, key: str, current: int, initial: 
         return
 
     days = U.editable_days(year, month, today)
+    commented = mask_from_days(commented_days(schedule, year, month, days))
     await query.answer()
-    await U.edit(
-        query,
-        f"К какому дню добавить комментарий? ({U.MONTHS_NOMINATIVE[month - 1]} {year})\n💬 — комментарий уже есть",
-        comment_picker_markup(owner, year, month, current, initial, today, commented_days(schedule, year, month, days)),
-    )
+    await render_comment_picker(query, owner, year, month, current, initial, today, commented, 0)
+
+
+async def on_comment_toggle(query, owner: int, key: str, current: int, initial: int, selected: int, commented: int, day: int, today: date):
+    year, month = U.parse_month_key(key)
+    if day not in U.editable_days(year, month, today):
+        await query.answer(U.STALE_TEXT, show_alert=True)
+        return
+    selected ^= 1 << (day - 1)
+    await query.answer()
+    await render_comment_picker(query, owner, year, month, current, initial, today, commented, selected)
+
+
+async def on_comment_write(query, context, owner: int, key: str, current: int, initial: int, selected: int, today: date):
+    year, month = U.parse_month_key(key)
+    days = days_from_mask(selected, U.editable_days(year, month, today))
+    if not days:
+        await query.answer(U.STALE_TEXT, show_alert=True)
+        return
+    await start_comment(query, context, owner, key, current, initial, days, today)
 
 
 async def on_save(query, owner: int, key: str, current: int, initial: int, today: date):
@@ -331,8 +396,14 @@ async def vlasuka_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await U.edit(query, calendar_text(year, month), calendar_markup(owner, year, month, current, initial, today))
         elif action == "c":
             await on_comment_picker(query, owner, parts[3], int(parts[4], 16), int(parts[5], 16), today)
-        elif action == "d":
-            await start_comment(query, context, owner, parts[3], int(parts[4], 16), int(parts[5], 16), int(parts[6]), today)
+        elif action == "p":
+            key, current, initial, selected, commented, day = (
+                parts[3], int(parts[4], 16), int(parts[5], 16), int(parts[6], 16), int(parts[7], 16), int(parts[8])
+            )
+            await on_comment_toggle(query, owner, key, current, initial, selected, commented, day, today)
+        elif action == "w":
+            key, current, initial, selected = parts[3], int(parts[4], 16), int(parts[5], 16), int(parts[6], 16)
+            await on_comment_write(query, context, owner, key, current, initial, selected, today)
         elif action == "r":
             key, current, initial = parts[3], int(parts[4], 16), int(parts[5], 16)
             year, month = U.parse_month_key(key)

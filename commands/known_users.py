@@ -1,5 +1,6 @@
 import logging
 import time
+from types import SimpleNamespace
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -77,6 +78,23 @@ async def remember(user):
         await get_store().mutate(save)
     except Exception:
         logging.exception("Не удалось сохранить ник пользователя")
+
+
+async def lookup_or_fetch(bot, username):
+    """Как lookup_fresh, но если ника всё ещё нет нигде в памяти бота, пробует узнать его напрямую у Telegram
+    (getChat по публичному нику срабатывает не всегда, поэтому это последняя попытка, не основная)."""
+    uid = await lookup_fresh(username)
+    if uid:
+        return uid
+    try:
+        from telegram import Chat
+        chat = await bot.get_chat(f"@{username}")
+    except Exception:
+        return None
+    if chat is None or chat.type != Chat.PRIVATE:
+        return None
+    await remember(SimpleNamespace(id=chat.id, username=chat.username, is_bot=False))
+    return chat.id
 
 
 async def track(update: Update, context: ContextTypes.DEFAULT_TYPE):
