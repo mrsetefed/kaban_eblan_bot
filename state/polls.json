@@ -340,7 +340,7 @@
       "chat_id": -5438968535,
       "date": "2026-10-03",
       "remind_at": "2026-10-02T12:00:00+00:00",
-      "reminded": false,
+      "reminded": true,
       "failures": 0,
       "participants": {
         "463045227": "kaban",
