@@ -339,7 +339,7 @@
       "command": "kogda_dnd",
       "chat_id": -5438968535,
       "date": "2026-10-03",
-      "remind_at": "2026-10-02T12:00:00+00:00",,
+      "remind_at": "2026-10-02T12:00:00+00:00",
       "reminded": false,
       "failures": 0,
       "participants": {
