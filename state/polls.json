@@ -191,6 +191,53 @@
       "answers": {},
       "cancelled": true,
       "finished_at": "2026-10-07T17:55:33.623053+00:00"
+    },
+    "5348336045710646216": {
+      "chat_id": -5438968535,
+      "command": "kogda_dnd",
+      "note": null,
+      "created_at": "2026-10-07T17:56:08.634791+00:00",
+      "next_check_at": "2026-10-08T02:41:31.450185+00:00",
+      "stage": 0,
+      "done": false,
+      "failures": 0,
+      "roles": [
+        "kaban",
+        "nekit",
+        "kapo",
+        "amir",
+        "ksusha"
+      ],
+      "participants": {
+        "463045227": "kaban",
+        "1759322833": "nekit",
+        "463088601": "kapo",
+        "522892896": "amir",
+        "5479061243": "ksusha"
+      },
+      "unresolved": [],
+      "polls": [
+        {
+          "poll_id": "5348336045710646216",
+          "message_id": 15364,
+          "options": [
+            "Ничего не подходит",
+            "11",
+            "19",
+            "23",
+            "31"
+          ],
+          "dates": [
+            null,
+            "2026-10-11",
+            "2026-10-19",
+            "2026-10-23",
+            "2026-10-31"
+          ],
+          "pinned": true
+        }
+      ],
+      "answers": {}
     }
   },
   "users": {
