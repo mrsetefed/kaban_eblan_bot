@@ -263,22 +263,6 @@
         "5479061243": "ksusha"
       },
       "reply_to": 14591
-    },
-    "kogda_dnd:2026-10-11": {
-      "command": "kogda_dnd",
-      "chat_id": -5438968535,
-      "date": "2026-10-11",
-      "remind_at": "2026-10-10T14:00:00+00:00",
-      "reminded": false,
-      "failures": 0,
-      "participants": {
-        "463045227": "kaban",
-        "1759322833": "nekit",
-        "463088601": "kapo",
-        "522892896": "amir",
-        "5479061243": "ksusha"
-      },
-      "reply_to": 14591
     }
   }
 }
