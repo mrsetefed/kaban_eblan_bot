@@ -270,66 +270,6 @@
     },
     "-1003821578039": {
       "days": {
-        "2026-09-25": {
-          "463045227": {
-            "score": 34,
-            "name": "setefed",
-            "username": "setefed"
-          },
-          "473842493": {
-            "score": 41,
-            "name": "meser",
-            "username": "realmeser"
-          }
-        },
-        "2026-09-26": {
-          "463045227": {
-            "score": 14,
-            "name": "setefed",
-            "username": "setefed"
-          },
-          "473842493": {
-            "score": 100,
-            "name": "meser",
-            "username": "realmeser"
-          }
-        },
-        "2026-09-27": {
-          "473842493": {
-            "score": 26,
-            "name": "meser",
-            "username": "realmeser"
-          },
-          "463045227": {
-            "score": 62,
-            "name": "setefed",
-            "username": "setefed"
-          }
-        },
-        "2026-09-29": {
-          "473842493": {
-            "score": 68,
-            "name": "meser",
-            "username": "realmeser"
-          },
-          "463045227": {
-            "score": 99,
-            "name": "setefed",
-            "username": "setefed"
-          }
-        },
-        "2026-10-01": {
-          "463045227": {
-            "score": 12,
-            "name": "setefed",
-            "username": "setefed"
-          },
-          "473842493": {
-            "score": 62,
-            "name": "meser",
-            "username": "realmeser"
-          }
-        },
         "2026-10-02": {
           "463045227": {
             "score": 63,
@@ -530,6 +470,13 @@
           },
           "463045227": {
             "score": 52,
+            "name": "setefed",
+            "username": "setefed"
+          }
+        },
+        "2026-11-06": {
+          "463045227": {
+            "score": 84,
             "name": "setefed",
             "username": "setefed"
           }
