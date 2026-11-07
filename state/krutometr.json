@@ -263,18 +263,6 @@
     },
     "-1003821578039": {
       "days": {
-        "2026-10-02": {
-          "463045227": {
-            "score": 63,
-            "name": "setefed",
-            "username": "setefed"
-          },
-          "473842493": {
-            "score": 79,
-            "name": "meser",
-            "username": "realmeser"
-          }
-        },
         "2026-10-04": {
           "473842493": {
             "score": 78,
@@ -477,6 +465,13 @@
             "score": 67,
             "name": "meser",
             "username": "realmeser"
+          }
+        },
+        "2026-11-08": {
+          "463045227": {
+            "score": 96,
+            "name": "setefed",
+            "username": "setefed"
           }
         }
       },
