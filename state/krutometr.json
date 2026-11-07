@@ -59,35 +59,6 @@
     },
     "-5264403141": {
       "days": {
-        "2026-10-02": {
-          "463088601": {
-            "score": 89,
-            "name": "Илья",
-            "username": "iluxa2286"
-          },
-          "522892896": {
-            "score": 45,
-            "name": "AmirotkZ",
-            "username": "Amirotkaz"
-          }
-        },
-        "2026-10-03": {
-          "463045227": {
-            "score": 9,
-            "name": "setefed",
-            "username": "setefed"
-          },
-          "463088601": {
-            "score": 88,
-            "name": "Илья",
-            "username": "iluxa2286"
-          },
-          "522892896": {
-            "score": 64,
-            "name": "AmirotkZ",
-            "username": "Amirotkaz"
-          }
-        },
         "2026-10-05": {
           "463088601": {
             "score": 48,
@@ -260,6 +231,13 @@
             "score": 45,
             "name": "AmirotkZ",
             "username": "Amirotkaz"
+          }
+        },
+        "2026-11-08": {
+          "463045227": {
+            "score": 96,
+            "name": "setefed",
+            "username": "setefed"
           }
         }
       },
