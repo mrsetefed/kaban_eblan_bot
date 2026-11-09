@@ -5,8 +5,8 @@
       "command": "kogda_dnd",
       "note": null,
       "created_at": "2026-11-08T19:20:52.642767+00:00",
-      "next_check_at": "2026-11-09T04:54:13.030162+00:00",
-      "stage": 0,
+      "next_check_at": "2026-11-09T14:12:44.903393+00:00",
+      "stage": 1,
       "done": false,
       "failures": 0,
       "roles": [
