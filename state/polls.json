@@ -99,7 +99,7 @@
       "chat_id": -5438968535,
       "date": "2026-11-28",
       "remind_at": "2026-11-27T14:00:00+00:00",
-      "reminded": false,
+      "reminded": true,
       "failures": 0,
       "participants": {
         "463045227": "kaban",
